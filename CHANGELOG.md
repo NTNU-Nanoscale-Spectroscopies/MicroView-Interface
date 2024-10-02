@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1] - 2024-10-01
+### <span style="color:green"> Added </span>
+- Dev : Choice of microscope for dashbord access
+- Dev : Selected microscope screen 
+- Dev : Connection with camera device
+- Dev : Live camera view in the camera frame
+### <span style="color:purple"> Issues </span>
+- Dev : The words on the label are cut off at the bottom.
+- Dev : Need to resize the camera view
+
 ## [0.1.0] - 2024-09-27
 ### <span style="color:green"> Added </span>
 - Design : Fields for selecting directory and file name
