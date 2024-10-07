@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.2] - 2024-10-07
+### <span style="color:green"> Added </span>
+- Design : New classes for frames
+- Dev : Adding directory items
+- Dev : Redesign of MyCamera class to return an image object and no more a canvas
+- Dev : Refactored CameraFrame class to create a canvas in this frame
+- Dev : Added methods to make images resizable
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : The words on the label are not cut on the nanolab laptop
+- Dev : Camera images can now be resized
+### <span style="color:purple"> Issues </span>
+- Dev : There are sometimes a few steps involved in rescaling camera images.
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : The MyImageManager class has been deleted, but the load_image method has been retained.
+
 ## [0.1.1] - 2024-10-01
 ### <span style="color:green"> Added </span>
 - Dev : Choice of microscope for dashbord access

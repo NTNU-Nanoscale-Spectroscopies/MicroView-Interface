@@ -1,29 +1,28 @@
 from customtkinter import *
 from PIL import Image, UnidentifiedImageError
 
-class MyImageManager:
-    def __init__(self):
-        self.images = {}
-    
-    def load_image(self, image_name, size, light_filename, dark_filename=None):
-        try:
-            light_image_data = Image.open(f"img/{light_filename}")
-        except (FileNotFoundError, UnidentifiedImageError) as e:
-            print(f"Error loading image {light_filename}: {e}")
-            light_image_data = None
 
-        try:
-            dark_image_data  = Image.open(f"img/{dark_filename}") if dark_filename else light_image_data
-        except (FileNotFoundError, UnidentifiedImageError) as e:
-            print(f"Error loading image {dark_filename}: {e}")
-            dark_image_data = None
+def load_image(size, light_filename, dark_filename=None, path="img/"):
+    try:
+        light_image_data = Image.open(f"{path}{light_filename}")
+    except (FileNotFoundError, UnidentifiedImageError) as e:
+        print(f"Error loading image {light_filename}: {e}")
+        light_image_data = None
+
+    try:
+        dark_image_data  = Image.open(f"{path}{dark_filename}") if dark_filename else light_image_data
+    except (FileNotFoundError, UnidentifiedImageError) as e:
+        print(f"Error loading image {dark_filename}: {e}")
+        dark_image_data = None
         
-        self.images[image_name] = CTkImage(light_image_data, dark_image_data, size)
+    return CTkImage(light_image_data, dark_image_data, size)
 
 
-    def get_image(self, image_name):
-        return self.images.get(image_name, None)
+img_microscope = load_image((150, 150), 'microscope_black.png', 'microscope_white.png')
+img_apparence_color_theme = load_image((30, 30), 'light_mode_icon.png', 'night_mode_icon.png')
 
-img_manager_01 = MyImageManager()
-img_manager_01.load_image('microscope', (150, 150), 'microscope_white.png', 'microscope_black.png')
-img_manager_01.load_image('apparence_color_theme', (30, 30), 'light_mode_icon.png', 'night_mode_icon.png')
+img_play = load_image((25, 25), 'play_icon_black.png', 'play_icon_white.png')
+img_pause = load_image((25, 25), 'pause_icon_black.png', 'pause_icon_white.png')
+img_save = load_image((25, 25), 'save_icon_black.png', 'save_icon_white.png')
+img_rescale = load_image((25, 25), 'rescale_icon_black.png', 'rescale_icon_white.png')
+img_full_screen = load_image((20, 20), 'full_screen_icon_black.png', 'full_screen_icon_white.png')

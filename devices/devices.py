@@ -13,6 +13,8 @@ class MyDevice:
 class MySpectrometer(MyDevice):
     def __init__(self, name, serial, enabled = True):
         super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
+    def connection(self):
+        pass
 
 
 class MyWhiteLight(MyDevice):

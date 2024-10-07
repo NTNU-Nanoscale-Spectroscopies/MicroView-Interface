@@ -9,9 +9,7 @@ from devices.camera_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
 from devices.camera_sdk.tl_camera_enums import SENSOR_TYPE
 from devices.camera_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 
-import tkinter as tk
 from PIL import Image, ImageTk
-import typing
 import threading
 import queue
 
@@ -19,76 +17,37 @@ import queue
 class MyCamera(MyDevice):
     def __init__(self, name, serial, enabled = True):
         super().__init__(name, serial, "ThorCam", "edtiable", enabled)
+        self.image_acquisition_thread = None
 
     def connection(self):
         try:
             self.sdk = TLCameraSDK()
             self.camera_list = self.sdk.discover_available_cameras()
-            #self.camera = self.sdk.open_camera(self.camera_list[0])
-            #print(self.camera_list)
-            self.camera = self.sdk.open_camera(self.serial)
-            self.connected = self.sdk._is_sdk_open
+            if self.serial in self.camera_list:
+                self.camera = self.sdk.open_camera(self.serial)
+                self.connected = self.sdk._is_sdk_open
+            else:
+                self.connected = False
         except Exception as e:
             print(f"Erreur de connexion : {e}")
             self.connected = False
         return self.connected
     
 
-    def run(self, canvas):
-        print("Generating app...")
-        #root = tk.Tk()
-        #root.title(self.camera.name)
-        self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
-        camera_widget = LiveViewCanvas(parent=canvas, image_queue=self.image_acquisition_thread.get_output_queue())
-
-        print("Setting camera parameters...")
-        self.camera.frames_per_trigger_zero_for_unlimited = 0
-        self.camera.arm(2)
-        self.camera.issue_software_trigger()
-
-        print("Starting image acquisition thread...")
-        self.image_acquisition_thread.start()
-
-        print("App starting")
-        #root.mainloop()
-
-        print("Waiting for image acquisition thread to finish...")
-        #image_acquisition_thread.stop()
-        #image_acquisition_thread.join()
-
-        print("Closing resources...")
-        
-        return camera_widget
+    def run(self):
+        if not self.image_acquisition_thread:
+            self.camera.frames_per_trigger_zero_for_unlimited = 0
+            self.camera.arm(2)
+            self.camera.issue_software_trigger()
+            self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
+            self.image_acquisition_thread.start()
+        return self.image_acquisition_thread.get_output_queue()
 
     def stop(self):
-        self.image_acquisition_thread.stop()
-        self.image_acquisition_thread.join()
-        print("Closing resources...")
-
-
-class LiveViewCanvas(tk.Canvas):
-
-    def __init__(self, parent, image_queue):
-        self.image_queue = image_queue
-        self._image_width = 0
-        self._image_height = 0
-        tk.Canvas.__init__(self, parent)
-        self.pack()
-        self._get_image()
-
-    def _get_image(self):
-        try:
-            image = self.image_queue.get_nowait()
-            self._image = ImageTk.PhotoImage(master=self, image=image)
-            #if (self._image.width() != self._image_width) or (self._image.height() != self._image_height):
-            #    self._image_width = self._image.width()
-            #    self._image_height = self._image.height()
-            #    self.config(width=self._image_width, height=self._image_height)
-            self.create_image(0, 0, image=self._image, anchor='nw')
-        except queue.Empty:
-            pass
-        self.after(10, self._get_image)
-
+        if self.image_acquisition_thread:
+            self.image_acquisition_thread.stop()
+            self.image_acquisition_thread.join()
+            self.image_acquisition_thread = None
 
 
 class ImageAcquisitionThread(threading.Thread):
@@ -131,9 +90,7 @@ class ImageAcquisitionThread(threading.Thread):
             self._image_width = width
             self._image_height = height
             print("Image dimension change detected, image acquisition thread was updated")
-        color_image_data = self._mono_to_color_processor.transform_to_24(frame.image_buffer,
-                                                                         self._image_width,
-                                                                         self._image_height)
+        color_image_data = self._mono_to_color_processor.transform_to_24(frame.image_buffer, self._image_width, self._image_height)
         color_image_data = color_image_data.reshape(self._image_height, self._image_width, 3)
         return Image.fromarray(color_image_data, mode='RGB')
 

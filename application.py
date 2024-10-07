@@ -30,7 +30,7 @@ class MyApp(ctk.CTk):
         self.microscopes_frame = MicroscopeFrame(self, [microscope for microscope in self.microscopes])
         self.microscopes_frame.grid(row=2, column=0, padx=50, pady=10, sticky="nsew")
 
-        self.button = ctk.CTkButton(self, text=None, width=50, height=50, image=img_manager_01.get_image('apparence_color_theme'), command=self.swicthThemeMode)
+        self.button = ctk.CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicthThemeMode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
 
 
@@ -57,20 +57,17 @@ class MyApp(ctk.CTk):
         self.button = ctk.CTkButton(self, text="< Back", command=self.menu)
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
-        self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
+        self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=(20, 10), sticky="nsew", rowspan=2)
-        # self.spectrometer_frame = SpectrometerFrame(self, self.find_device_by_type(microscope, MySpectrometer))
-        # self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
+        self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
+        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
-        self.camera_frame = SpectrometerFrame(self)
-        self.camera_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
-        self.camera_frame = SpectrometerFrame(self)
-        self.camera_frame.grid(row=1, column=0, padx=(20, 10), pady=(20, 10), sticky="nsew")
-        self.camera_frame = SpectrometerFrame(self)
-        self.camera_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
+        self.directory_frame = DirectoryFrame(self)
+        self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=(20, 10), sticky="nsew")
+        self.quick_setup_frame = QuickSetupFrame(self)
+        self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
 
-    def find_device_by_type(self, microscope, device_type):
-        """Cherche le premier appareil du type spécifié dans le microscope."""
+    def findDeviceByType(self, microscope, device_type):
         for device in microscope.devices.values():
             if isinstance(device, device_type):
                 return device
