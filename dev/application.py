@@ -1,16 +1,26 @@
-from devices.camera import *
-from devices.devices import *
-from wigdets import *
+from dev.devices.camera.camera import *
+from dev.devices.spectrometer.spectrometer import *
+from dev.devices.whitelight.whitelight import *
+from dev.devices.laser.laser import *
+from dev.devices.filter.filter import *
+from dev.devices.platform.platform import *
+
+from dev.frames.microscope_frame import *
+from dev.frames.camera_frame import *
+from dev.frames.spectrometer_frame import *
+from dev.frames.directory_frame import *
+
+from dev.images.images import *
 
 
 class MyApp(ctk.CTk):
-    def __init__(self, version, *microscopes):
+    def __init__(self, version, size, *microscopes):
         super().__init__(fg_color=["gray92","gray14"])
         self.version = version
         self.microscopes = list(microscopes)
         self.apparence_color_theme = "light"
-        self.centerWindow([1200, 700])
-        set_default_color_theme("theme/MyTheme.json")
+        self.centerWindow(size)
+        set_default_color_theme("dev/themes/MyTheme.json")
         self.menu()
 
     def menu(self):
@@ -49,12 +59,13 @@ class MyApp(ctk.CTk):
         for widget in self.winfo_children():
             widget.destroy()
         
+        self.title(f"{microscope.name} - Config panel")
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure((1, 2, 3, 4), weight=1)
 
         self.label = ctk.CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
-        self.button = ctk.CTkButton(self, text="< Back", command=self.menu)
+        self.button = ctk.CTkButton(self, text="< Back", command = lambda m=microscope: self.stopDevices(m))
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
         self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
@@ -72,6 +83,11 @@ class MyApp(ctk.CTk):
             if isinstance(device, device_type):
                 return device
         return None
+
+    def stopDevices(self, microscope):
+        for device in microscope.devices.values():
+            device.stop()
+        self.menu()
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"

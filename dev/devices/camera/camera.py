@@ -1,13 +1,13 @@
-from devices.devices import MyDevice
+from dev.devices.devices import MyDevice
 
 try:
     from .windows_setup import configure_path
     configure_path()
 except ImportError:
     configure_path = None
-from devices.camera_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
-from devices.camera_sdk.tl_camera_enums import SENSOR_TYPE
-from devices.camera_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
+from dev.devices.camera.camera_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
+from dev.devices.camera.camera_sdk.tl_camera_enums import SENSOR_TYPE
+from dev.devices.camera.camera_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 
 from PIL import Image, ImageTk
 import threading
@@ -29,7 +29,7 @@ class MyCamera(MyDevice):
             else:
                 self.connected = False
         except Exception as e:
-            print(f"Erreur de connexion : {e}")
+            print(f"Unable to connect to device “{self.name}”, serial : “{self.serial}”. {e}")
             self.connected = False
         return self.connected
     

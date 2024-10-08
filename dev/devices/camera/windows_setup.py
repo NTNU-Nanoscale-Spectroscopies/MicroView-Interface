@@ -19,22 +19,12 @@ import sys
 
 
 def configure_path():
-    is_64bits = sys.maxsize > 2**32
-    relative_path_to_dlls = '..' + os.sep + 'dlls' + os.sep
-
-    if is_64bits:
-        relative_path_to_dlls += '64_lib'
-    else:
-        relative_path_to_dlls += '32_lib'
-
+    relative_path_to_dlls = 'dlls' + os.sep
     absolute_path_to_file_directory = os.path.dirname(os.path.abspath(__file__))
-
     absolute_path_to_dlls = os.path.abspath(absolute_path_to_file_directory + os.sep + relative_path_to_dlls)
-
     os.environ['PATH'] = absolute_path_to_dlls + os.pathsep + os.environ['PATH']
 
     try:
-        # Python 3.8 introduces a new method to specify dll directory
         os.add_dll_directory(absolute_path_to_dlls)
     except AttributeError:
         pass

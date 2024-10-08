@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3] - 2024-10-08
+### <span style="color:green"> Added </span>
+- Dev : Adding spectrometer connection
+- Dev : Spectrometer measurement display added
+### <span style="color:#d6a600"> Changed </span>
+- Design : Reorganization of dev folders and files
+### <span style="color:purple"> Issues </span>
+- Dev : Impossible to return to menu (cause devices must be stopped)
+
 ## [0.1.2] - 2024-10-07
 ### <span style="color:green"> Added </span>
 - Design : New classes for frames
