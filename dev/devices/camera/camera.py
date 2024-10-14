@@ -15,39 +15,46 @@ import queue
 
 
 class MyCamera(MyDevice):
-    def __init__(self, name, serial, enabled = True):
-        super().__init__(name, serial, "ThorCam", "edtiable", enabled)
+    def __init__(self, name, serial, enabled=True):
+        super().__init__(name, serial, "ThorCam", "editable", enabled)
         self.image_acquisition_thread = None
 
-    def connection(self):
+    def connect(self):
+        self.connected = False
+        self.is_running = False
         try:
             self.sdk = TLCameraSDK()
             self.camera_list = self.sdk.discover_available_cameras()
             if self.serial in self.camera_list:
                 self.camera = self.sdk.open_camera(self.serial)
+                self.camera.frames_per_trigger_zero_for_unlimited = 0
+                self.camera.arm(2)
+                self.camera.issue_software_trigger()
                 self.connected = self.sdk._is_sdk_open
-            else:
-                self.connected = False
         except Exception as e:
-            print(f"Unable to connect to device “{self.name}”, serial : “{self.serial}”. {e}")
-            self.connected = False
+            print(f"Unable to connect to “{self.name}” device with serial number “{self.serial}” : {e}")
         return self.connected
     
 
     def run(self):
-        if not self.image_acquisition_thread:
-            self.camera.frames_per_trigger_zero_for_unlimited = 0
-            self.camera.arm(2)
-            self.camera.issue_software_trigger()
+        if self.connected and not self.is_running and not self.image_acquisition_thread:
             self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
             self.image_acquisition_thread.start()
+            self.is_running = True
         return self.image_acquisition_thread.get_output_queue()
 
     def stop(self):
-        if self.image_acquisition_thread:
+        if self.connected and self.is_running and self.image_acquisition_thread:
             self.image_acquisition_thread.stop()
             self.image_acquisition_thread.join()
             self.image_acquisition_thread = None
+            self.is_running = False
+
+    def disconnect(self):
+        if self.connected:
+            self.stop()
+            self.sdk.dispose()
+            self.connected = False
 
 
 class ImageAcquisitionThread(threading.Thread):

@@ -15,10 +15,11 @@ from dev.images.images import *
 
 class MyApp(ctk.CTk):
     def __init__(self, version, size, *microscopes):
-        super().__init__(fg_color=["gray92","gray14"])
+        super().__init__()
         self.version = version
         self.microscopes = list(microscopes)
         self.apparence_color_theme = "light"
+        self.swicthThemeMode()
         self.centerWindow(size)
         set_default_color_theme("dev/themes/MyTheme.json")
         self.menu()
@@ -42,6 +43,7 @@ class MyApp(ctk.CTk):
 
         self.button = ctk.CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicthThemeMode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
+        self.update_idletasks()
 
 
     def swicthThemeMode(self):
@@ -77,6 +79,7 @@ class MyApp(ctk.CTk):
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=(20, 10), sticky="nsew")
         self.quick_setup_frame = QuickSetupFrame(self)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
+        self.update_idletasks()
 
     def findDeviceByType(self, microscope, device_type):
         for device in microscope.devices.values():
@@ -86,7 +89,7 @@ class MyApp(ctk.CTk):
 
     def stopDevices(self, microscope):
         for device in microscope.devices.values():
-            device.stop()
+            device.disconnect()
         self.menu()
 
     def __repr__(self):

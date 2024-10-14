@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.4] - 2024-10-14
+### <span style="color:green"> Added </span>
+- Design : Implementation of the backup directory nomenclature
+- Dev : Camera and spectrometer backup system
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Entry color and ploceholder until selection
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Redesign of spectrometer acquisition to make it generic
+### <span style="color:purple"> Issues </span>
+- Dev : Phantom programming line, print needed for spectrometer aquisition
+
 ## [0.1.3] - 2024-10-08
 ### <span style="color:green"> Added </span>
 - Dev : Adding spectrometer connection
