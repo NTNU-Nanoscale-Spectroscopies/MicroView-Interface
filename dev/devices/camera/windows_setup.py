@@ -15,8 +15,6 @@ be used instead:
 """
 
 import os
-import sys
-
 
 def configure_path():
     relative_path_to_dlls = 'dlls' + os.sep

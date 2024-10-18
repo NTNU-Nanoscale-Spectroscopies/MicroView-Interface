@@ -1,13 +1,13 @@
-from dev.images.images import *
-from dev.frames.notification import *
-import customtkinter as ctk
-import matplotlib.pyplot as plt
+from ..images.images import *
+from .notification import *
+
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.pyplot import *
 import tkinter
 import csv
 
 
-class SpectrometerFrame(ctk.CTkFrame):
+class SpectrometerFrame(CTkFrame):
     def __init__(self, master, spectrometer):
         super().__init__(master)
         self.grid_columnconfigure(1, weight=1)
@@ -15,13 +15,13 @@ class SpectrometerFrame(ctk.CTkFrame):
         self.grid_propagate(False)
 
         if not spectrometer:
-            self.label = ctk.CTkLabel(self, text="No spectrometer", font=("Arial", 25))
+            self.label = CTkLabel(self, text="No spectrometer", font=("Arial", 25))
             self.label.grid(row=3, column=1, padx=5, pady=5)
             return
 
-        self.disconnected_label = ctk.CTkLabel(self, text="Disconnected", font=("Arial", 25))
+        self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
-        self.disconnected_button = ctk.CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.try_connection)
+        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.try_connection)
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.wavelengths = None
@@ -38,7 +38,7 @@ class SpectrometerFrame(ctk.CTkFrame):
             self.data_queue = None
             self.spectrometer.set_integration_time(100000)
 
-            self.figure, self.plot1 = plt.subplots(figsize=(6, 4), dpi=100)
+            self.figure, self.plot1 = subplots(figsize=(6, 4), dpi=100)
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
             self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=4)
             toolbar_frame = tkinter.Frame(self)
@@ -46,17 +46,19 @@ class SpectrometerFrame(ctk.CTkFrame):
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
             self.toolbar.update()
 
-            self.fullscreen_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_full_screen, fg_color="transparent")
-            self.fullscreen_button.grid(row=0, column=0, padx=5, pady=5, sticky="ne")
-            self.play_button = ctk.CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
+            self.fullscreen_button = CTkButton(self, text="", width=30, height=40, image=img_full_screen, fg_color="transparent")
+            self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+            self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
             self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-            self.pause_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
+            self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
             self.pause_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
-            self.save_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_data)
+            self.save_button = CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_data)
             self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
 
             if self.spectrometer.enable:
                 self.start_spectrometer()
+        else:
+            self.master.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
 
 
     def start_spectrometer(self):
@@ -89,6 +91,7 @@ class SpectrometerFrame(ctk.CTkFrame):
                         writer = csv.writer(file)
                         writer.writerow(['Wavelength [nm]', 'Intensity [counts]'])
                         writer.writerows(zip(self.wavelengths, self.intensities))
+                    file_path = self.master.directory_frame.get_spectrometer_directory(update_placeholder=True)
                     self.master.notification(f"Successfully saved as", file_path, "#1a8300")
                     print(f"Data saved successfully to {file_path}")
                 except Exception as e:

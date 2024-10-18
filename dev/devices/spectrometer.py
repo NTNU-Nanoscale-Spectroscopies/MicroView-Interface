@@ -1,4 +1,4 @@
-from dev.devices.devices import MyDevice
+from .devices import MyDevice
 from seabreeze.spectrometers import Spectrometer
 import threading
 import queue

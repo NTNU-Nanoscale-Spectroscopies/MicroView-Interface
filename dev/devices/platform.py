@@ -1,4 +1,4 @@
-from dev.devices.devices import MyDevice
+from .devices import MyDevice
 
 
 class MyPlatform(MyDevice):

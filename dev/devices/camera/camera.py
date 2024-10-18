@@ -1,18 +1,13 @@
-from dev.devices.devices import MyDevice
+from ..devices import MyDevice
+from .windows_setup import configure_path
+from .camera_sdk.tl_camera import TLCameraSDK
+from .camera_sdk.tl_camera_enums import SENSOR_TYPE
+from .camera_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
 
-try:
-    from .windows_setup import configure_path
-    configure_path()
-except ImportError:
-    configure_path = None
-from dev.devices.camera.camera_sdk.tl_camera import TLCameraSDK, TLCamera, Frame
-from dev.devices.camera.camera_sdk.tl_camera_enums import SENSOR_TYPE
-from dev.devices.camera.camera_sdk.tl_mono_to_color_processor import MonoToColorProcessorSDK
-
-from PIL import Image, ImageTk
+from PIL import Image
 import threading
 import queue
-
+configure_path()
 
 class MyCamera(MyDevice):
     def __init__(self, name, serial, enabled=True):

@@ -1,19 +1,20 @@
-from dev.devices.camera.camera import *
-from dev.devices.spectrometer.spectrometer import *
-from dev.devices.whitelight.whitelight import *
-from dev.devices.laser.laser import *
-from dev.devices.filter.filter import *
-from dev.devices.platform.platform import *
+from .devices.camera.camera import *
+from .devices.spectrometer import *
+from .devices.whitelight import *
+from .devices.laser import *
+from .devices.filter import *
+from .devices.platform import *
 
-from dev.frames.microscope_frame import *
-from dev.frames.camera_frame import *
-from dev.frames.spectrometer_frame import *
-from dev.frames.directory_frame import *
+from .widgets.microscope_frame import *
+from .widgets.camera_frame import *
+from .widgets.spectrometer_frame import *
+from .widgets.directory_frame import *
+from .widgets.notification import *
 
-from dev.images.images import *
+from .images.images import *
 
 
-class MyApp(ctk.CTk):
+class MyApp(CTk):
     def __init__(self, version, size, *microscopes):
         super().__init__()
         self.version = version
@@ -34,22 +35,22 @@ class MyApp(ctk.CTk):
         self.grid_rowconfigure((0, 1, 3, 4), weight=0)
         self.grid_rowconfigure(2, weight=1)
 
-        self.label = ctk.CTkLabel(self, text="Welcome back !", font=("Arial", 45))
+        self.label = CTkLabel(self, text="Welcome back !", font=("Arial", 45))
         self.label.grid(row=0, column=0, padx=(50, 0), pady=(50, 0), sticky="w")
-        self.label = ctk.CTkLabel(self, text="Please choose your microscope", font=("Arial", 30))
+        self.label = CTkLabel(self, text="Please choose your microscope", font=("Arial", 30))
         self.label.grid(row=1, column=0, padx=(50, 0), pady=(20, 0), sticky="w")
 
         self.microscopes_frame = MicroscopeFrame(self, [microscope for microscope in self.microscopes])
         self.microscopes_frame.grid(row=2, column=0, padx=50, pady=10, sticky="nsew")
 
-        self.button = ctk.CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicthThemeMode)
+        self.button = CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicthThemeMode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
         self.update_idletasks()
 
 
     def swicthThemeMode(self):
         self.apparence_color_theme = "light" if self.apparence_color_theme == "dark" else "dark"
-        ctk.set_appearance_mode(self.apparence_color_theme)
+        set_appearance_mode(self.apparence_color_theme)
 
 
     def centerWindow(self, size):
@@ -66,9 +67,9 @@ class MyApp(ctk.CTk):
         self.grid_columnconfigure((0, 1), weight=1)
         self.grid_rowconfigure((1, 2, 3, 4), weight=1)
 
-        self.label = ctk.CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
+        self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
-        self.button = ctk.CTkButton(self, text="< Back", command = lambda m=microscope: self.stopDevices(m))
+        self.button = CTkButton(self, text="< Back", command = lambda m=microscope: self.stopDevices(m))
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
         self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
@@ -76,11 +77,11 @@ class MyApp(ctk.CTk):
         self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
+        self.update_idletasks()
         self.directory_frame = DirectoryFrame(self)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         self.quick_setup_frame = QuickSetupFrame(self)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
-        self.update_idletasks()
 
     def findDeviceByType(self, microscope, device_type):
         for device in microscope.devices.values():

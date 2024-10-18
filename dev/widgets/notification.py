@@ -29,8 +29,9 @@ class Notification(CTkToplevel):
         
         self.text_frame = CTkFrame(self.frame, fg_color="transparent")
         self.text_frame.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=12)
+
         self.head_label = CTkLabel(self.text_frame, text=head_message, font=("Arial", 14))
-        self.head_label.pack(anchor="w")
+        self.head_label.pack(anchor="w", side=None if message else "left")
         self.message_label = CTkLabel(self.text_frame, text=message, font=("Arial", 10))
         self.message_label.pack(anchor="w")
 

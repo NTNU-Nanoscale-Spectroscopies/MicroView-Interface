@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1] - 2024-10-18
+### <span style="color:#d6a600"> Changed </span>
+- Design : Reorganization of devices folder
+- Design : Rename frame folder to widget
+- Dev : General clean-up
+- Dev : Updating smart placeholder to predict next filename
+
 ## [0.2.0] - 2024-10-18
 ### <span style="color:green"> Added </span>
 - Dev : Adding backup notification system
