@@ -5,10 +5,11 @@ from datetime import date
 
 class DirectoryFrame(ctk.CTkFrame):
     def __init__(self, master):
-        super().__init__(master)
+        super().__init__(master, height=10)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure((0,1), weight=1)
-        self.directory = "/Users/A068/Desktop/Data"
+        self.grid_propagate(False)
+        self.base_directory = "/Users/A068/Desktop/Data"
 
         self.label = ctk.CTkLabel(self, text="Camera backup name :", font=("Arial", 14))
         self.label.grid(row=0, column=0, padx=(20,0), pady=(20,5), sticky="sw")
@@ -23,33 +24,35 @@ class DirectoryFrame(ctk.CTkFrame):
         self.button = ctk.CTkButton(self, text="", corner_radius=50, width=15, image=img_info, fg_color="transparent")
         self.button.grid(row=0, column=1, padx=5, pady=5, sticky="ne")
 
-
-    def get_camera_directory(self):
-        today = str(date.today())
-        file_name = self.camera_backup_name.get()
-        if not file_name: file_name = "Picture"
-
-        i = 1
-        file_path = os.path.expanduser(f"{self.directory}/{today}/Pictures/{file_name}_%s.png")
-        while os.path.exists(file_path % i): i += 1
-
-        return f"{self.directory}/{today}/Pictures/{file_name}_{str(i)}.png"
+        self.get_camera_directory(auto_create_folders=False)
+        self.get_spectrometer_directory(auto_create_folders=False)
 
 
-    def get_spectrometer_directory(self):
+    def get_camera_directory(self, auto_create_folders=True):
+        file_name = self.camera_backup_name.get() or "Picture"
+        file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/Pictures/")
+        if not os.path.exists(file_path) and auto_create_folders: os.makedirs(file_path)
+        iteration = self.get_available_iteration(file_path + f"{file_name}_%s.png")
+        file_name = f"{file_name}_{iteration}.png"
+        self.camera_backup_name.configure(placeholder_text=file_name)
+        return f"{file_path}{file_name}"
+
+
+    def get_spectrometer_directory(self, auto_create_folders=True):
         integration_time = "1000ns"
-        today = str(date.today())
-        file_name = self.spectrometer_backup_name.get()
-        if not file_name: file_name = "Spectrum"
-        folder_name = file_name
-        file_name += f"_{today.replace("-", "")}_"
-        end_file_name = f"_{integration_time}.txt"
+        file_name = self.spectrometer_backup_name.get() or "Spectrum"
+        file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/{file_name}/")
+        if not os.path.exists(file_path) and auto_create_folders: os.makedirs(file_path)
+        file_name += f"_{date.today().strftime("%Y%m%d")}"
+        iteration = self.get_available_iteration(file_path + f"{file_name}_%s_{integration_time}.txt")
+        file_name = f"{file_name}_{iteration}_{integration_time}.txt"
+        self.spectrometer_backup_name.configure(placeholder_text=file_name)
+        return f"{file_path}{file_name}"
+        
 
-        i = 1
-        file_path = os.path.expanduser(f"{self.directory}/{today}/{folder_name}/{file_name}%s{end_file_name}")
+    def get_available_iteration(self, file_path, i=1):
         while os.path.exists(file_path % i): i += 1
-
-        return f"{self.directory}/{today}/{folder_name}/{file_name}{str(i)}{end_file_name}"
+        return str(i)
 
 
 

@@ -18,6 +18,7 @@ class MyApp(ctk.CTk):
         super().__init__()
         self.version = version
         self.microscopes = list(microscopes)
+        self.notif_list = []
         self.apparence_color_theme = "light"
         self.swicthThemeMode()
         self.centerWindow(size)
@@ -71,12 +72,12 @@ class MyApp(ctk.CTk):
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
         self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
-        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=(20, 10), sticky="nsew", rowspan=2)
+        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
         self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
         self.directory_frame = DirectoryFrame(self)
-        self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=(20, 10), sticky="nsew")
+        self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         self.quick_setup_frame = QuickSetupFrame(self)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
         self.update_idletasks()
@@ -91,6 +92,12 @@ class MyApp(ctk.CTk):
         for device in microscope.devices.values():
             device.disconnect()
         self.menu()
+
+    def notification(self, head_message=None, message=None, color=None):
+        notif = Notification(head_message, message, color)
+        self.notif_list.insert(0, notif)
+        for notif in self.notif_list[1:]:
+            notif.move()
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"

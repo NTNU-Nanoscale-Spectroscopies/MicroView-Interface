@@ -1,4 +1,5 @@
 from dev.images.images import *
+from dev.frames.notification import *
 import customtkinter as ctk
 import queue
 
@@ -8,6 +9,7 @@ class CameraFrame(ctk.CTkFrame):
         super().__init__(master)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(3, weight=1)
+        self.grid_propagate(False)
 
         if not camera:
             self.label = ctk.CTkLabel(self, text="No camera", font=("Arial", 25))
@@ -39,11 +41,11 @@ class CameraFrame(ctk.CTkFrame):
             self.image_label.grid(row=0, column=0, sticky="nsew", rowspan=4)
             self.fullscreen_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_full_screen, fg_color="transparent")
             self.fullscreen_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="ne")
-            self.play_button = ctk.CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_camera) #, state= "disabled" if self.camera.is_running else "normal")
+            self.play_button = ctk.CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_camera, state= "disabled" if self.camera.is_running else "normal")
             self.play_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="nw")
-            self.pause_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera) #, state= "normal" if self.camera.is_running else "disabled")
+            self.pause_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera, state= "normal" if self.camera.is_running else "disabled")
             self.pause_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
-            self.save_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_image) #, state= "disabled" if self.camera.is_running else "normal")
+            self.save_button = ctk.CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_image, state= "disabled" if self.camera.is_running else "normal")
             self.save_button.grid(row=2, column=0, padx=5, pady=(5,0), sticky="nw")
 
             self.current_image = None
@@ -101,6 +103,8 @@ class CameraFrame(ctk.CTkFrame):
             if file_path:
                 try:
                     self.current_image.save(file_path)
+                    self.master.notification(f"Successfully saved as", file_path, "#1a8300")
                     print(f"Image saved to {file_path}")
                 except Exception as e:
                     print(f"Error saving image: {e}")
+                    self.master.notification(f"Impossible to save as", file_path, "#8e0101")

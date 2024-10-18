@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.2.0] - 2024-10-18
+### <span style="color:green"> Added </span>
+- Dev : Adding backup notification system
+- Dev : Adding smart placeholder
+
 ## [0.1.4] - 2024-10-14
 ### <span style="color:green"> Added </span>
 - Design : Implementation of the backup directory nomenclature
