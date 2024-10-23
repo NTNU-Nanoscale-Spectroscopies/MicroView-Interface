@@ -1,5 +1,5 @@
 from ..images.images import *
-from datetime import date
+from datetime import *
 
 
 class DirectoryFrame(CTkFrame):
@@ -31,29 +31,15 @@ class DirectoryFrame(CTkFrame):
         file_name = self.camera_backup_name.get() or "Picture"
         file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/Pictures/")
         if not os.path.exists(file_path) and not update_placeholder: os.makedirs(file_path)
-        iteration = self.get_available_iteration(file_path + f"{file_name}_%s.png")
-        file_name = f"{file_name}_{iteration}.png"
+        file_name += f"_{datetime.now():%H.%M.%S}.png"
         self.camera_backup_name.configure(placeholder_text=file_name)
         return f"{file_path}{file_name}"
 
 
-    def get_spectrometer_directory(self, update_placeholder=False):
-        integration_time = "1000ns"
+    def get_spectrometer_directory(self, integration_time="", update_placeholder=False):
         file_name = self.spectrometer_backup_name.get() or "Spectrum"
         file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/{file_name}/")
         if not os.path.exists(file_path) and not update_placeholder: os.makedirs(file_path)
-        file_name += f"_{date.today().strftime("%Y%m%d")}"
-        iteration = self.get_available_iteration(file_path + f"{file_name}_%s_{integration_time}.txt")
-        file_name = f"{file_name}_{iteration}_{integration_time}.txt"
+        file_name += f"_{datetime.now():%Y%m%d_%H.%M.%S}_{integration_time}μs.txt"
         self.spectrometer_backup_name.configure(placeholder_text=file_name)
         return f"{file_path}{file_name}"
-        
-
-    def get_available_iteration(self, file_path, i=1):
-        while os.path.exists(file_path % i): i += 1
-        return str(i)
-
-
-
-class QuickSetupFrame(CTkFrame):
-    pass

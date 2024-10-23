@@ -1,17 +1,9 @@
-from .devices.camera.camera import *
-from .devices.spectrometer import *
-from .devices.whitelight import *
-from .devices.laser import *
-from .devices.filter import *
-from .devices.platform import *
-
 from .widgets.microscope_frame import *
 from .widgets.camera_frame import *
 from .widgets.spectrometer_frame import *
 from .widgets.directory_frame import *
+from .widgets.setup_frame import *
 from .widgets.notification import *
-
-from .images.images import *
 
 
 class MyApp(CTk):
@@ -64,8 +56,10 @@ class MyApp(CTk):
             widget.destroy()
         
         self.title(f"{microscope.name} - Config panel")
-        self.grid_columnconfigure((0, 1), weight=1)
-        self.grid_rowconfigure((1, 2, 3, 4), weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=2)
+        self.grid_rowconfigure((1,2), weight=2)
+        self.grid_rowconfigure((3,4), weight=4)
 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
@@ -80,7 +74,7 @@ class MyApp(CTk):
         self.update_idletasks()
         self.directory_frame = DirectoryFrame(self)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
-        self.quick_setup_frame = QuickSetupFrame(self)
+        self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
 
     def findDeviceByType(self, microscope, device_type):
@@ -92,6 +86,7 @@ class MyApp(CTk):
     def stopDevices(self, microscope):
         for device in microscope.devices.values():
             device.disconnect()
+        self.notif_list = []
         self.menu()
 
     def notification(self, head_message=None, message=None, color=None):

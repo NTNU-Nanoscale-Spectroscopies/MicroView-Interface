@@ -12,13 +12,13 @@ class CameraFrame(CTkFrame):
 
         if not camera:
             self.label = CTkLabel(self, text="No camera", font=("Arial", 25))
-            self.label.grid(row=3, column=0, padx=5, pady=5)
+            self.label.grid(row=3, column=1, padx=5, pady=5)
             return
 
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
-        self.disconnected_label.grid(row=3, column=0, padx=5, pady=5)
+        self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
         self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.try_connection)
-        self.disconnected_button.grid(row=3, column=0, padx=5, pady=(75, 0))
+        self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.camera = camera
         self.try_connection()
@@ -40,12 +40,12 @@ class CameraFrame(CTkFrame):
             self.image_label.grid(row=0, column=1, sticky="nsew", rowspan=4)
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent")
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=(5,0), sticky="ne")
+            self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera)
+            self.pause_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="nw")
             self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_camera)
             self.play_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="nw")
-            self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera)
-            self.pause_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
             self.save_button = CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_image)
-            self.save_button.grid(row=2, column=0, padx=5, pady=(5,0), sticky="nw")
+            self.save_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
 
             self.current_image = None
             if self.camera.enable: 
@@ -56,17 +56,13 @@ class CameraFrame(CTkFrame):
 
     def start_camera(self):
         self.image_queue = self.camera.run()
-        self.play_button.configure(state= "disabled")
-        self.save_button.configure(state= "disabled")
-        self.pause_button.configure(state= "normal")
+        self.pause_button.lift()
         self.update_image()
 
 
     def stop_camera(self):
         self.camera.stop()
-        self.play_button.configure(state= "normal")
-        self.save_button.configure(state= "normal")
-        self.pause_button.configure(state= "disabled")
+        self.play_button.lift()
 
 
     def update_image(self):
@@ -91,7 +87,6 @@ class CameraFrame(CTkFrame):
 
 
     def resize_image(self):
-        print(f"Resize, id : {self.resize_after_id}")
         if self.aspect_ratio:
             frame_width = int(self.master.winfo_width() /3)
             frame_height = int(self.master.winfo_height() /3)
@@ -116,3 +111,7 @@ class CameraFrame(CTkFrame):
                 except Exception as e:
                     print(f"Error saving image: {e}")
                     self.master.notification(f"Impossible to save as", file_path, "#8e0101")
+            else:
+                self.master.notification(f"No directory to save", color="#8e0101")
+        else:
+            self.master.notification(f"No image to save", color="#8e0101")

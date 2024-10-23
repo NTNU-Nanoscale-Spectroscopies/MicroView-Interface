@@ -46,13 +46,15 @@ class SpectrometerFrame(CTkFrame):
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
             self.toolbar.update()
 
-            self.fullscreen_button = CTkButton(self, text="", width=30, height=40, image=img_full_screen, fg_color="transparent")
+            self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent")
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
             self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
             self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
             self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
-            self.pause_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
+            self.pause_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
             self.save_button = CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_data)
+            self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
+            self.save_button = CTkButton(self, text="", width=30, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save)
             self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
 
             if self.spectrometer.enable:
@@ -63,11 +65,13 @@ class SpectrometerFrame(CTkFrame):
 
     def start_spectrometer(self):
         self.spectrometer.start()
+        self.pause_button.lift()
         self.update_graph()
 
 
     def stop_spectrometer(self):
         self.spectrometer.stop()
+        self.play_button.lift()
 
 
     def update_graph(self):
@@ -84,7 +88,7 @@ class SpectrometerFrame(CTkFrame):
 
     def save_data(self):
         if self.wavelengths is not None and self.intensities is not None:
-            file_path = self.master.directory_frame.get_spectrometer_directory()
+            file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time)
             if file_path:
                 try:
                     with open(file_path, mode='w', newline='') as file:
@@ -96,4 +100,11 @@ class SpectrometerFrame(CTkFrame):
                     print(f"Data saved successfully to {file_path}")
                 except Exception as e:
                     print(f"Error saving data: {e}")
-                    self.master.notification(f"Impossible to save as", file_path, "#8e0101")        
+                    self.master.notification(f"Impossible to save as", file_path, "#8e0101")
+            else:
+                self.master.notification(f"No directory to save", color="#8e0101")
+        else:
+            self.master.notification(f"No data to save", color="#8e0101")
+    
+    def advanced_save(self):
+        pass

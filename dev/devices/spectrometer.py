@@ -47,3 +47,4 @@ class MySpectrometer(MyDevice):
     def set_integration_time(self, time_microseconds):
         if self.connected: 
             self.spectrometer.integration_time_micros(time_microseconds)
+            self.integration_time = time_microseconds

@@ -24,6 +24,7 @@ img_apparence_color_theme = load_image((30, 30), 'moon_icon_black.png', 'sun_ico
 img_play = load_image((25, 25), 'play_icon_black.png', 'play_icon_white.png')
 img_pause = load_image((25, 25), 'pause_icon_black.png', 'pause_icon_white.png')
 img_save = load_image((25, 25), 'save_icon_black.png', 'save_icon_white.png')
+img_advanced_save = load_image((25, 25), 'advanced_save_icon_black.png', 'advanced_save_icon_white.png')
 img_rescale = load_image((25, 25), 'rescale_icon_black.png', 'rescale_icon_white.png')
 img_full_screen = load_image((20, 20), 'full_screen_icon_black.png', 'full_screen_icon_white.png')
 img_retry = load_image((25, 25), 'retry_icon_grey.png')

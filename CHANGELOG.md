@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.2] - 2024-10-23
+### <span style="color:green"> Added </span>
+- Dev : Adding autofill to the quick setup frame
+- Dev : Adding auto hide and show the scrollbar of the quick setup frame
+- Dev : Adding a check on the validity of the spectrometer acquisition time entry
+- Dev : Adding disable of quick setup widgets if the switch is not selected
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Ingrement number in backup filename has been replaced by hour, minutes, seconds
+
 ## [0.2.1] - 2024-10-18
 ### <span style="color:#d6a600"> Changed </span>
 - Design : Reorganization of devices folder
