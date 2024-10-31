@@ -48,7 +48,8 @@ class MyCamera(MyDevice):
     def disconnect(self):
         if self.connected:
             self.stop()
-            self.sdk.dispose()
+            #self.camera.disarm()
+            self.camera.dispose()
             self.connected = False
 
 
@@ -91,7 +92,6 @@ class ImageAcquisitionThread(threading.Thread):
         if (width != self._image_width) or (height != self._image_height):
             self._image_width = width
             self._image_height = height
-            print("Image dimension change detected, image acquisition thread was updated")
         color_image_data = self._mono_to_color_processor.transform_to_24(frame.image_buffer, self._image_width, self._image_height)
         color_image_data = color_image_data.reshape(self._image_height, self._image_width, 3)
         return Image.fromarray(color_image_data, mode='RGB')
@@ -115,7 +115,6 @@ class ImageAcquisitionThread(threading.Thread):
             except Exception as error:
                 print("Encountered error: {error}, image acquisition will stop.".format(error=error))
                 break
-        print("Image acquisition has stopped")
         if self._is_color:
             self._mono_to_color_processor.dispose()
             self._mono_to_color_sdk.dispose()

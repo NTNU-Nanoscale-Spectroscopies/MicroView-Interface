@@ -34,7 +34,7 @@ class CameraFrame(CTkFrame):
             self.aspect_ratio = None
             self.image_width = None
             self.image_height = None
-            self.bind("<Configure>", self.on_resize)
+            #self.bind("<Configure>", self.on_resize)
 
             self.image_label = CTkLabel(self, text="")
             self.image_label.grid(row=0, column=1, sticky="nsew", rowspan=4)
@@ -77,7 +77,7 @@ class CameraFrame(CTkFrame):
                 self.image_label.configure(image=ctk_image)
             except queue.Empty:
                 pass
-            self.after(20, self.update_image)
+            self.after(100, self.update_image)
 
 
     def on_resize(self, event):
@@ -88,8 +88,8 @@ class CameraFrame(CTkFrame):
 
     def resize_image(self):
         if self.aspect_ratio:
-            frame_width = int(self.master.winfo_width() /3)
-            frame_height = int(self.master.winfo_height() /3)
+            frame_width = int(self.master.winfo_width() /2.6)
+            frame_height = int(self.master.winfo_height() /2.6)
 
             if frame_width / frame_height > self.aspect_ratio:
                 self.image_height = frame_height
@@ -105,7 +105,6 @@ class CameraFrame(CTkFrame):
             if file_path:
                 try:
                     self.current_image.save(file_path)
-                    self.master.directory_frame.get_camera_directory(update_placeholder=True)
                     self.master.notification(f"Successfully saved as", file_path, "#1a8300")
                     print(f"Image saved to {file_path}")
                 except Exception as e:

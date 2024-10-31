@@ -9,7 +9,10 @@ class MyDevice:
         self.is_running = False
 
     def disconnect(self):
-        pass
+        print("MyDevice disconnect")
+
+    def stop(self):
+        print("MyDevice stop")
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

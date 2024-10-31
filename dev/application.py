@@ -4,6 +4,7 @@ from .widgets.spectrometer_frame import *
 from .widgets.directory_frame import *
 from .widgets.setup_frame import *
 from .widgets.notification import *
+import ctypes
 
 
 class MyApp(CTk):
@@ -14,6 +15,7 @@ class MyApp(CTk):
         self.notif_list = []
         self.apparence_color_theme = "light"
         self.swicthThemeMode()
+        self.set_windows_scale()
         self.centerWindow(size)
         set_default_color_theme("dev/themes/MyTheme.json")
         self.menu()
@@ -92,12 +94,22 @@ class MyApp(CTk):
     def notification(self, head_message=None, message=None, color=None):
         notif = Notification(head_message, message, color)
         self.notif_list.insert(0, notif)
+        shift = notif.winfo_height() + 8
         for notif in self.notif_list[1:]:
-            notif.move()
+            notif.draw(shift)
+            shift += notif.winfo_height() + 10
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
 
+    def set_windows_scale(self):
+        self.scale = 1
+        if sys.platform.startswith("win"):
+            user32 = ctypes.windll.user32
+            hdc = user32.GetDC(0)
+            dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
+            user32.ReleaseDC(0, hdc)
+            self.scale = dpi / 96
 
 
 class MyMicroscope:

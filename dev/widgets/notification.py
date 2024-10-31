@@ -3,12 +3,10 @@ import sys
 
 class Notification(CTkToplevel):
     
-    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3000, alpha=0.90, width=400, height=75, corner_radius=25, border_width=2, cancel_button=True, **kwargs):
+    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3000, alpha=0.90, width=400, height=50, corner_radius=25, border_width=2, cancel_button=True, **kwargs):
         super().__init__()
 
         self.overrideredirect(True)
-        self.width = width
-        self.height = height
         self.alpha = alpha
         self.attributes('-alpha', 0)
         
@@ -24,6 +22,14 @@ class Notification(CTkToplevel):
             corner_radius = 0
             self.withdraw()
 
+        if head_message:
+            width = max(width, len(head_message) * 9)
+        if message:
+            width = max(width, len(message) * 6)
+            height += 25
+        self.width = width
+        self.height = height
+
         self.frame = CTkFrame(self, bg_color=self.transparent_color, corner_radius=corner_radius, border_width=border_width, border_color=border_color, **kwargs)
         self.frame.pack(expand=True, fill="both")
         
@@ -38,38 +44,32 @@ class Notification(CTkToplevel):
         if cancel_button:
             self.button_frame = CTkFrame(self.frame, fg_color="transparent")
             self.button_frame.pack(side="top", anchor="ne", padx=7+border_width, pady=7+border_width)
-            self.button_close = CTkButton(self.button_frame, corner_radius=10, width=0, height=0, hover=False, text_color=self.frame._border_color, text="✕", fg_color="transparent", command=self.destroy_annim)
+            self.button_close = CTkButton(self.button_frame, corner_radius=10, width=0, height=0, hover=False, text_color=self.frame._border_color, text="✕", fg_color="transparent", command=self.remove)
             self.button_close.pack()
 
         self.resizable(width=False, height=False)
         self.transient(self.master)
         self.update_idletasks()
-        
-        self.x = int(self.master.winfo_width() + self.master.winfo_x() - self.width * 1.49)
-        self.y = int(self.master.winfo_height() + self.master.winfo_y() - self.height)
-    
-        self._iconify()
-        self.attributes('-alpha', alpha)
-        self.after(time_before_delete, self.destroy_annim)
-        
-    def _iconify(self):
-        self.deiconify()
-        self.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
+        self.draw()
 
-    def destroy_annim(self):
+        self.attributes('-alpha', alpha)
+        self.after(time_before_delete, self.remove)
+
+    def remove(self):
         self.alpha -= .1
         self.attributes('-alpha', self.alpha)
         if self.alpha <= 0:
             self.master.notif_list.remove(self)
             self.destroy()
+            height_sum = 0
             for notif in self.master.notif_list[:]: 
-                notif.move()
+                notif.draw(height_sum)
+                height_sum += notif.winfo_height() + 10
         else:
-            self.after(40, self.destroy_annim)
+            self.after(40, self.remove)
 
-    def move(self):
-        if self in self.master.notif_list:
-            index = self.master.notif_list.index(self)
-            self.x = int(self.master.winfo_width() + self.master.winfo_x() - self.width * 1.49)
-            self.y = int(self.master.winfo_height() + self.master.winfo_y() - self.height - self.height * 1.6 * index)
-            self._iconify()
+    def draw(self, shift=0):
+        self.x = int(self.master.winfo_width() + self.master.winfo_x() - self.width * self.master.scale)
+        self.y = int(self.master.winfo_height() + self.master.winfo_y() - self.height * self.master.scale - shift + 25)
+        self.deiconify()
+        self.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")

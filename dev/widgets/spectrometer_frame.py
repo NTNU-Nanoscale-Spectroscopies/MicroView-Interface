@@ -95,7 +95,6 @@ class SpectrometerFrame(CTkFrame):
                         writer = csv.writer(file)
                         writer.writerow(['Wavelength [nm]', 'Intensity [counts]'])
                         writer.writerows(zip(self.wavelengths, self.intensities))
-                    file_path = self.master.directory_frame.get_spectrometer_directory(update_placeholder=True)
                     self.master.notification(f"Successfully saved as", file_path, "#1a8300")
                     print(f"Data saved successfully to {file_path}")
                 except Exception as e:

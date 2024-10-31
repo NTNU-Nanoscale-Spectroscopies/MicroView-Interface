@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.3] - 2024-10-31
+### <span style="color:green"> Added </span>
+- Dev : Notification size now resized according to content
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Notification positioning now takes screen scale into account
+### <span style="color:#d6a600"> Changed </span>
+- Dev : File incrementation is replaced by hours
+- Dev : The management of integration time by the user is now in milliseconds
+### <span style="color:purple"> Issues </span>
+- Dev : Notifications are not attached to the main window
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : The smart placeholder system has been removed, as file increment has been replaced by time.
+
 ## [0.2.2] - 2024-10-23
 ### <span style="color:green"> Added </span>
 - Dev : Adding autofill to the quick setup frame
