@@ -18,7 +18,7 @@ class DirectoryFrame(CTkFrame):
         time = f"{datetime.now():%Y%m%d_%H.%M.%S}"
         self.camera_backup_name = CTkEntry(self, placeholder_text=f"Picture_{time}")
         self.camera_backup_name.grid(row=0, column=1, padx=(5,20), pady=(20,5), sticky="sew")
-        self.spectrometer_backup_name = CTkEntry(self, placeholder_text=f"Spectrum_{time}_100ms")
+        self.spectrometer_backup_name = CTkEntry(self, placeholder_text=f"Spectrum_{time}_100.0ms")
         self.spectrometer_backup_name.grid(row=1, column=1, padx=(5,20), pady=(5,20), sticky="ew")
 
 

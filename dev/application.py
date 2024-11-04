@@ -65,7 +65,7 @@ class MyApp(CTk):
 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
-        self.button = CTkButton(self, text="< Back", command = lambda m=microscope: self.stopDevices(m))
+        self.button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command = lambda m=microscope: self.stopDevices(m))
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
         self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))

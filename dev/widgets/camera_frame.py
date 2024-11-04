@@ -38,7 +38,7 @@ class CameraFrame(CTkFrame):
 
             self.image_label = CTkLabel(self, text="")
             self.image_label.grid(row=0, column=1, sticky="nsew", rowspan=4)
-            self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent")
+            self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=(5,0), sticky="ne")
             self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera)
             self.pause_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="nw")
@@ -114,3 +114,7 @@ class CameraFrame(CTkFrame):
                 self.master.notification(f"No directory to save", color="#8e0101")
         else:
             self.master.notification(f"No image to save", color="#8e0101")
+
+
+    def extend(self):
+        self.master.notification(f"Coming soon !", color="#006bd2")

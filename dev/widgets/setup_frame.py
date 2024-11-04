@@ -30,8 +30,8 @@ class QuickSetupFrame(CTkScrollableFrame):
                 widget_to_disable.append(button)
                 
             elif isinstance(device, MySpectrometer): 
-                entry = CTkEntry(frame, width=100, placeholder_text="100")
-                button = CTkButton(frame, text="Set", width=30, state=state, command=lambda d=device, e=entry: self.check_vailde_entry(d,e))
+                entry = CTkEntry(frame, width=100, placeholder_text="100.0")
+                button = CTkButton(frame, text="Set", width=30, state=state, command=lambda d=device, e=entry: self.check_valide_entry(d,e))
                 label = CTkLabel(frame, text="ms")
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
@@ -68,7 +68,7 @@ class QuickSetupFrame(CTkScrollableFrame):
             device.stop()
 
 
-    def check_vailde_entry(self, device, entry):
+    def check_valide_entry(self, device, entry):
         try:
             value = float(entry.get())
             if 1 <= value <= 10000:

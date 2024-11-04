@@ -29,3 +29,4 @@ img_rescale = load_image((25, 25), 'rescale_icon_black.png', 'rescale_icon_white
 img_full_screen = load_image((20, 20), 'full_screen_icon_black.png', 'full_screen_icon_white.png')
 img_retry = load_image((25, 25), 'retry_icon_grey.png')
 img_info = load_image((15, 15), 'info_icon_black.png', 'info_icon_white.png')
+img_plus = load_image((15, 15), 'plus_icon_black.png', 'plus_icon_white.png')

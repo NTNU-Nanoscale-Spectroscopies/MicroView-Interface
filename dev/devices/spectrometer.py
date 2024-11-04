@@ -7,6 +7,7 @@ class MySpectrometer(MyDevice):
     def __init__(self, name, serial, enabled = True):
         super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
         self.data_queue = queue.Queue()
+        self.integration_time = None
 
     def connect(self):
         try:

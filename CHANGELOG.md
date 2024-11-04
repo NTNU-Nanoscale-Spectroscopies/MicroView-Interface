@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.4] - 2024-11-04
+### <span style="color:green"> Added </span>
+- Dev : Spectrometer data can now be overlaid by previous data
+- Dev : Advanced save popup
+- Dev : Synchronous advanced save function
+
 ## [0.2.3] - 2024-10-31
 ### <span style="color:green"> Added </span>
 - Dev : Notification size now resized according to content

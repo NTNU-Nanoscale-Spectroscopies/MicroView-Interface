@@ -71,5 +71,4 @@ class Notification(CTkToplevel):
     def draw(self, shift=0):
         self.x = int(self.master.winfo_width() + self.master.winfo_x() - self.width * self.master.scale)
         self.y = int(self.master.winfo_height() + self.master.winfo_y() - self.height * self.master.scale - shift + 25)
-        self.deiconify()
         self.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
