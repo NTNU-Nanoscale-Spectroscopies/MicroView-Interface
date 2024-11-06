@@ -30,9 +30,19 @@ class DirectoryFrame(CTkFrame):
         return f"{file_path}{file_name}"
 
 
-    def get_spectrometer_directory(self, integration_time=""):
-        file_name = self.spectrometer_backup_name.get() or "Spectrum"
+    def get_spectrometer_directory(self, integration_time="", name=None):
+        file_name = name or self.spectrometer_backup_name.get() or "Spectrum"
         file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/{file_name}/")
         if not os.path.exists(file_path): os.makedirs(file_path)
-        file_name += f"_{datetime.now():%Y%m%d_%H.%M.%S}_{integration_time/1000}ms.txt"
+        file_name += f"_#__{datetime.now():%Y%m%d}_@_{integration_time/1000}ms.txt"
         return f"{file_path}{file_name}"
+
+
+    def get_available_iteration(self, file_path, i=1):
+        directory = os.path.dirname(file_path)
+        base_name = f"{file_path.split('#__')[0]}"
+        existing_files = os.listdir(directory)
+        
+        while any(f.startswith(f"{os.path.basename(base_name)}{i}") for f in existing_files):
+            i += 1
+        return i

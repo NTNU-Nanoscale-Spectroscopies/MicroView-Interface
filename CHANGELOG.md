@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2024-11-06
+### <span style="color:green"> Added </span>
+- Dev : Add legend to chart
+- Dev : Spectrometer starts when advanced save is called
+- Dev : Spectrometer stops when overlaid chart is called
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Advanced save function is now asynchronous
+- Dev : Backup files names now contain the time and iteration number
+- Dev : The data queue is now clear when the integration time changes
+
 ## [0.2.4] - 2024-11-04
 ### <span style="color:green"> Added </span>
 - Dev : Spectrometer data can now be overlaid by previous data

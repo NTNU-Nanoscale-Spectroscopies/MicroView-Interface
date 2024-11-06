@@ -7,7 +7,7 @@ class MySpectrometer(MyDevice):
     def __init__(self, name, serial, enabled = True):
         super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
         self.data_queue = queue.Queue()
-        self.integration_time = None
+        self.integration_time = 100000
 
     def connect(self):
         try:
@@ -36,6 +36,7 @@ class MySpectrometer(MyDevice):
 
     def stop(self):
         self.is_running = False
+        if not self.is_running: return
         if self.data_thread.is_alive():
             self.data_thread.join()
 
@@ -47,5 +48,6 @@ class MySpectrometer(MyDevice):
 
     def set_integration_time(self, time_microseconds):
         if self.connected: 
+            self.data_queue.queue.clear()
             self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds

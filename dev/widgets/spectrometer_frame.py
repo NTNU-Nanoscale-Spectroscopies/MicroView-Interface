@@ -4,7 +4,6 @@ from .notification import *
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.pyplot import *
 from datetime import *
-import time
 import tkinter
 import csv
 
@@ -40,7 +39,7 @@ class SpectrometerFrame(CTkFrame):
             self.disconnected_button.grid_forget()
 
             self.data_queue = None
-            self.spectrometer.set_integration_time(100000)
+            self.spectrometer.set_integration_time(self.spectrometer.integration_time)
 
             self.figure, self.plot1 = subplots(figsize=(6, 4), dpi=100)
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
@@ -66,7 +65,7 @@ class SpectrometerFrame(CTkFrame):
             if self.spectrometer.enable:
                 self.start_spectrometer()
         else:
-            self.master.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
+            self.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
 
 
     def start_spectrometer(self):
@@ -87,14 +86,19 @@ class SpectrometerFrame(CTkFrame):
             self.plot1.plot(self.wavelengths, self.intensities)
             self.plot1.set_xlabel('Wavelength [nm]')
             self.plot1.set_ylabel('Intensity [counts]')
+            self.plot1.grid()
             self.canvas.draw()
             self.after(20, self.update_graph)
         elif self.spectrometer.is_running and self.spectrometer.data_queue.empty():
             self.after(100, self.update_graph)
 
-    def save_data(self):
+
+    def save_data(self, file_path=None, single_save=True):
         if self.wavelengths is not None and self.intensities is not None:
-            file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time)
+            if single_save:
+                file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time)
+                counts = self.master.directory_frame.get_available_iteration(file_path)
+                file_path = file_path.replace("#", str(counts)).replace("@", f"{datetime.now():%H.%M.%S}")
             if file_path:
                 try:
                     with open(file_path, mode='w', newline='') as file:
@@ -102,37 +106,34 @@ class SpectrometerFrame(CTkFrame):
                         writer.writerow(['Wavelength [nm]', ' Intensity [counts]'])
                         writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
                         writer.writerows(zip(self.wavelengths, self.intensities))
-                    self.master.notification(f"Successfully saved as", file_path, "#1a8300")
-                    print(f"Data saved successfully to {file_path}")
+                    if single_save:
+                        self.notification(f"Successfully saved as", file_path, "#1a8300")
+                        print(f"Data saved successfully to {file_path}")
                 except Exception as e:
                     print(f"Error saving data: {e}")
-                    self.master.notification(f"Impossible to save as", file_path, "#8e0101")
+                    self.notification(f"Impossible to save as", file_path, "#8e0101")
             else:
-                self.master.notification(f"No directory to save", color="#8e0101")
+                self.notification(f"No directory to save", color="#8e0101")
         else:
-            self.master.notification(f"No data to save", color="#8e0101")
+            self.notification(f"No data to save", color="#8e0101")
+    
     
     def advanced_save(self):
-        self.popup.attributes("-topmost", True)
-        if not self.check_acquisition_time(): return
-        if not self.check_backups_counts(): return
-        if not self.check_interval_time(): return
-
-        backups_counts = int(self.backups_counts.get())
-        interval_time = int(self.interval_time.get())
-        self.spectrometer.set_integration_time(interval_time *1000)
-
-        for i in range(backups_counts):
-            time.sleep(interval_time /1000)
-            self.save_data()
-
-        self.close_popup()
+        if self.backups_counts > 0:
+            self.backups_counts -= 1
+            file_name = self.file_path.replace("#", str(self.file_counts)).replace("@", f"{datetime.now():%H.%M.%S}")
+            self.save_data(file_name, False)
+            self.file_counts += 1
+            self.after(self.interval_time, self.advanced_save)
+        else:
+            if self.stop_after_saves.get():
+                self.stop_spectrometer()
+            self.notification(f"Serial backup completed !", color="#1a8300")
+            self.close_popup()
     
 
     def advanced_save_popup(self):
-        if self.popup:
-            self.popup.focus()
-        else:
+        if not self.popup:
             self.popup = CTkToplevel(self)
             self.popup.title("Spectrometer - Advanced save")
             self.popup.minsize(405, 310)
@@ -150,35 +151,38 @@ class SpectrometerFrame(CTkFrame):
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=1, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="File name :").pack(side="left", padx=(40,0))
-            self.backup_name = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms")
-            self.backup_name.pack(side="left", fill="x", expand=True, padx=(20,40))
+            self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms")
+            self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=2, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Acquisition time :").pack(side="left", padx=(40,20))
-            self.acquisition_time = CTkEntry(frame, placeholder_text="100.0")
-            self.acquisition_time.pack(side="left")
+            self.acquisition_time_entry = CTkEntry(frame, placeholder_text="100.0")
+            self.acquisition_time_entry.pack(side="left")
             CTkLabel(frame, text="ms").pack(side="left", padx=5)
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=3, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Number of files to backup :").pack(side="left", padx=(40,10))
             CTkButton(frame, text="-", width=10, fg_color="transparent").pack(side="left")
-            self.backups_counts = CTkEntry(frame, width=100, placeholder_text="10")
-            self.backups_counts.pack(side="left", padx=1)
+            self.backups_counts_entry = CTkEntry(frame, width=100, placeholder_text="10")
+            self.backups_counts_entry.pack(side="left", padx=1)
             CTkButton(frame, text="+", width=10, fg_color="transparent").pack(side="left")
             CTkLabel(frame, text="files").pack(side="left", padx=5)
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=4, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Time between backups :").pack(side="left", padx=(40,20))
-            self.interval_time = CTkEntry(frame, placeholder_text="1000.0")
-            self.interval_time.pack(side="left")
+            self.interval_time_entry = CTkEntry(frame, placeholder_text="1000")
+            self.interval_time_entry.pack(side="left")
             CTkLabel(frame, text="ms").pack(side="left", padx=5)
 
-            CTkCheckBox(self.popup, text="Stop acquisition time after saves", border_width=2, border_color="#1F6AA5").grid(row=5, column=0, padx=40, sticky="nsew", columnspan=2)
+            self.stop_after_saves = CTkCheckBox(self.popup, text="Stop acquisition time after saves", border_width=2, border_color="#1F6AA5")
+            self.stop_after_saves.grid(row=5, column=0, padx=40, sticky="nsew", columnspan=2)
             CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=6, column=0, padx=(40,20), pady=20, sticky="ew")
-            CTkButton(self.popup, text="Save", command=self.advanced_save).grid(row=6, column=1, padx=(20,40), pady=20, sticky="ew")
+            CTkButton(self.popup, text="Save", command=self.check_all_entry).grid(row=6, column=1, padx=(20,40), pady=20, sticky="ew")
+
+        self.popup.focus_force()
 
 
     def center_popup(self, size):
@@ -192,42 +196,60 @@ class SpectrometerFrame(CTkFrame):
         self.popup = None
     
 
+    def check_all_entry(self):
+        if not self.check_acquisition_time(): return
+        if not self.check_backups_counts(): return
+        if not self.check_interval_time(): return
+        wait_before_process = self.spectrometer.integration_time /1000 + self.acquisition_time
+        self.spectrometer.set_integration_time(self.acquisition_time *1000)
+        self.popup.withdraw()
+        self.file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time, self.backup_name_entry.get())
+        self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
+        self.start_spectrometer()
+        self.after(wait_before_process, self.advanced_save)
+        self.notification(f"Serial backup has begun...", color="#006bd2")
+
+
     def check_acquisition_time(self):
         try:
-            if 1 <= float(self.acquisition_time.get()) <= 10000:
+            self.acquisition_time = float(self.acquisition_time_entry.get())
+            if 1 <= self.acquisition_time <= 10000:
                 return True
             else:
-                self.master.notification(f"Integration time must be between 1 ms and 10000 ms", color="#8e0101")
+                self.notification(f"Integration time must be between 1 ms and 10000 ms", color="#8e0101")
                 return False
         except:
-            self.master.notification(f"Integration time must be a number", color="#8e0101")
+            self.notification(f"Integration time must be a number", color="#8e0101")
             return False
 
 
     def check_backups_counts(self):
         try:
-            result = int(self.backups_counts.get()) > 0
+            self.backups_counts = int(self.backups_counts_entry.get())
+            result = self.backups_counts > 0
             if not result:
-                self.master.notification(f"The number of backups must be higher than 0", color="#8e0101")
+                self.notification(f"The number of backups must be higher than 0", color="#8e0101")
             return result
         except:
-            self.master.notification(f"The number of backups must be an integer", color="#8e0101")
+            self.notification(f"The number of backups must be an integer", color="#8e0101")
             return False
 
 
     def check_interval_time(self):
         try:
-            result = float(self.interval_time.get()) >= float(self.acquisition_time.get())
+            self.interval_time = int(self.interval_time_entry.get())
+            result = self.interval_time >= self.acquisition_time
             if not result:
-                self.master.notification(f"Time between backup must be bigger than the acquisition time", color="#8e0101")
+                self.notification(f"Time between backup must be bigger than the acquisition time", color="#8e0101")
             return result
         except:
-            self.master.notification(f"Time between backups must be a number", color="#8e0101")
+            self.notification(f"Time between backups must be an integer", color="#8e0101")
             return False
 
 
     def import_chart(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+        self.stop_spectrometer()
         if file_path:
             x, y = [], []
             
@@ -251,10 +273,21 @@ class SpectrometerFrame(CTkFrame):
                             x.append(float(parts[0]))
                             y.append(float(parts[1]))
 
-            self.plot1.plot(x, y, label=f'Curve {len(self.plot1.lines) + 1}')            
+            if len(self.plot1.lines) == 1:
+                self.plot1.clear()
+                self.plot1.plot(self.wavelengths, self.intensities, label="Current")
+                self.plot1.set_xlabel('Wavelength [nm]')
+                self.plot1.set_ylabel('Intensity [counts]')
+                self.plot1.grid()
+            legend = os.path.basename(file_path).split('__')[0]
+            self.plot1.plot(x, y, label=legend)            
             self.plot1.legend()
             self.canvas.draw()
 
 
     def extend(self):
-        self.master.notification(f"Coming soon !", color="#006bd2")
+        self.notification(f"Coming soon !", color="#006bd2")
+
+    def notification(self, head_message=None, message=None, color=None,):
+        self.master.notification(head_message, message, color)
+        if self.popup: self.popup.focus_force()
