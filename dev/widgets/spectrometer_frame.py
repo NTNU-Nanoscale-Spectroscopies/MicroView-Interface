@@ -38,9 +38,7 @@ class SpectrometerFrame(CTkFrame):
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
-            self.data_queue = None
             self.spectrometer.set_integration_time(self.spectrometer.integration_time)
-
             self.figure, self.plot1 = subplots(figsize=(6, 4), dpi=100)
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
             self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=4)
@@ -80,17 +78,16 @@ class SpectrometerFrame(CTkFrame):
 
 
     def update_graph(self):
-        if self.spectrometer.is_running and not self.spectrometer.data_queue.empty():
-            self.wavelengths, self.intensities = self.spectrometer.data_queue.get()
-            self.plot1.clear()
-            self.plot1.plot(self.wavelengths, self.intensities)
-            self.plot1.set_xlabel('Wavelength [nm]')
-            self.plot1.set_ylabel('Intensity [counts]')
-            self.plot1.grid()
-            self.canvas.draw()
+        if self.spectrometer.is_running:
+            if not self.spectrometer.data_queue.empty():
+                self.wavelengths, self.intensities = self.spectrometer.data_queue.get()
+                self.plot1.clear()
+                self.plot1.plot(self.wavelengths, self.intensities)
+                self.plot1.set_xlabel('Wavelength [nm]')
+                self.plot1.set_ylabel('Intensity [counts]')
+                self.plot1.grid()
+                self.canvas.draw()
             self.after(20, self.update_graph)
-        elif self.spectrometer.is_running and self.spectrometer.data_queue.empty():
-            self.after(100, self.update_graph)
 
 
     def save_data(self, file_path=None, single_save=True):
@@ -200,8 +197,11 @@ class SpectrometerFrame(CTkFrame):
         if not self.check_acquisition_time(): return
         if not self.check_backups_counts(): return
         if not self.check_interval_time(): return
-        wait_before_process = self.spectrometer.integration_time /1000 + self.acquisition_time
+        wait_before_process = int(self.spectrometer.integration_time /1000 + self.acquisition_time)
+        if not self.spectrometer.is_running:
+            wait_before_process += 1000
         self.spectrometer.set_integration_time(self.acquisition_time *1000)
+        self.spectrometer.clear()
         self.popup.withdraw()
         self.file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time, self.backup_name_entry.get())
         self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
@@ -213,10 +213,10 @@ class SpectrometerFrame(CTkFrame):
     def check_acquisition_time(self):
         try:
             self.acquisition_time = float(self.acquisition_time_entry.get())
-            if 1 <= self.acquisition_time <= 10000:
+            if 8 <= self.acquisition_time <= 1600000:
                 return True
             else:
-                self.notification(f"Integration time must be between 1 ms and 10000 ms", color="#8e0101")
+                self.notification(f"Integration time must be between 8 ms and 1600000 ms", color="#8e0101")
                 return False
         except:
             self.notification(f"Integration time must be a number", color="#8e0101")
@@ -248,39 +248,43 @@ class SpectrometerFrame(CTkFrame):
 
 
     def import_chart(self):
-        file_path = filedialog.askopenfilename(filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+        file_paths = filedialog.askopenfilenames(filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
         self.stop_spectrometer()
-        if file_path:
-            x, y = [], []
-            
-            if file_path.endswith(".csv"):
-                with open(file_path, newline='') as file:
-                    reader = csv.reader(file)
-                    next(reader)
-                    for row in reader:
-                        x.append(float(row[0]))
-                        y.append(float(row[1]))
-            
-            else:
-                with open(file_path, 'r') as file:
-                    for line in file:
-                        if line.strip() == ">>>>>Begin Spectral Data<<<<<":
-                            break
-                    
-                    for line in file:
-                        parts = line.strip().split(',')
-                        if len(parts) == 2: 
-                            x.append(float(parts[0]))
-                            y.append(float(parts[1]))
-
+        if file_paths:
             if len(self.plot1.lines) == 1:
                 self.plot1.clear()
                 self.plot1.plot(self.wavelengths, self.intensities, label="Current")
                 self.plot1.set_xlabel('Wavelength [nm]')
                 self.plot1.set_ylabel('Intensity [counts]')
                 self.plot1.grid()
-            legend = os.path.basename(file_path).split('__')[0]
-            self.plot1.plot(x, y, label=legend)            
+            
+            for file_path in file_paths:
+                x, y = [], []
+            
+                if file_path.endswith(".csv"):
+                    with open(file_path, newline='') as file:
+                        reader = csv.reader(file)
+                        next(reader)
+                        for row in reader:
+                            x.append(float(row[0]))
+                            y.append(float(row[1]))
+                
+                else:
+                    with open(file_path, 'r') as file:
+                        for line in file:
+                            if line.strip() == ">>>>>Begin Spectral Data<<<<<":
+                                break
+                        
+                        for line in file:
+                            parts = line.strip().split(',')
+                            if len(parts) == 2: 
+                                x.append(float(parts[0]))
+                                y.append(float(parts[1]))
+
+
+                legend = os.path.basename(file_path).split('__')[0]
+                self.plot1.plot(x, y, label=legend)
+
             self.plot1.legend()
             self.canvas.draw()
 

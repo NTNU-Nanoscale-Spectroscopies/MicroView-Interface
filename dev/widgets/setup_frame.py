@@ -71,11 +71,11 @@ class QuickSetupFrame(CTkScrollableFrame):
     def check_valide_entry(self, device, entry):
         try:
             value = float(entry.get())
-            if 1 <= value <= 10000:
+            if 8 <= value <= 1600000:
                 device.set_integration_time(value * 1000)
                 self.notification(f"Integration time set at {value} ms", "#1a8300")
             else:
-                self.notification(f"Integration time must be between 1 ms and 10000 ms", "#8e0101")
+                self.notification(f"Integration time must be between 8 ms and 1600000 ms", "#8e0101")
         except:
             self.notification(f"Integration time must be a number", "#8e0101")
 

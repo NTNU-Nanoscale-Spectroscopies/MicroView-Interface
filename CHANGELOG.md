@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.3.1] - 2024-11-08
+### <span style="color:green"> Added </span>
+- Dev : Multiple files can be selected at the same time for overlay graphics
+- Dev : Adding some optimisation (cam: 10Hz, spectro: 50Hz, save: 50Hz)
+
 ## [0.3.0] - 2024-11-06
 ### <span style="color:green"> Added </span>
 - Dev : Add legend to chart
