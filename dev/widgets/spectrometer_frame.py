@@ -5,6 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.pyplot import *
 from datetime import *
 import tkinter
+import time
 import csv
 
 
@@ -28,9 +29,13 @@ class SpectrometerFrame(CTkFrame):
         self.popup = None
         self.wavelengths = None
         self.intensities = None
+        self.backup_name = None
+        self.stop_after_saves = False
+        self.save_frequency = 1
+        self.backups_counts_memorie = 10
         self.main_master = master
         self.spectrometer = spectrometer
-        self.try_connection()
+        self.after(120, self.try_connection)
 
 
     def try_connection(self):
@@ -79,8 +84,8 @@ class SpectrometerFrame(CTkFrame):
 
     def update_graph(self):
         if self.spectrometer.is_running:
-            if not self.spectrometer.data_queue.empty():
-                self.wavelengths, self.intensities = self.spectrometer.data_queue.get()
+            if not self.spectrometer.chart_queue.empty():
+                self.wavelengths, self.intensities = self.spectrometer.chart_queue.get()
                 self.plot1.clear()
                 self.plot1.plot(self.wavelengths, self.intensities)
                 self.plot1.set_xlabel('Wavelength [nm]')
@@ -116,18 +121,20 @@ class SpectrometerFrame(CTkFrame):
     
     
     def advanced_save(self):
-        if self.backups_counts > 0:
+        time.sleep((self.acquisition_time /1000) + 0.5)
+        self.spectrometer.save_queue.queue.clear()
+        while self.backups_counts > 0:
             self.backups_counts -= 1
+            self.wavelengths, self.intensities = self.spectrometer.save_queue.get()
             file_name = self.file_path.replace("#", str(self.file_counts)).replace("@", f"{datetime.now():%H.%M.%S}")
             self.save_data(file_name, False)
             self.file_counts += 1
-            self.after(self.interval_time, self.advanced_save)
-        else:
-            if self.stop_after_saves.get():
-                self.stop_spectrometer()
-            self.notification(f"Serial backup completed !", color="#1a8300")
-            self.close_popup()
-    
+
+        if self.stop_after_saves:
+            self.stop_spectrometer()
+        self.notification(f"Serial backup completed !", color="#1a8300")
+        self.thread_finish = True
+
 
     def advanced_save_popup(self):
         if not self.popup:
@@ -141,6 +148,7 @@ class SpectrometerFrame(CTkFrame):
 
             time = f"{datetime.now():%Y%m%d_%H.%M.%S}"
             acq = (self.spectrometer.integration_time or 100000) /1000
+            self.backup_name = self.backup_name or self.master.directory_frame.spectrometer_backup_name.get()
 
             title = CTkLabel(self.popup, text="Please define your backup settings :", font=("Arial", 20))
             title.grid(row=0, column=0, padx=(40,0), pady=(30,20), sticky="w", columnspan=2)
@@ -148,38 +156,56 @@ class SpectrometerFrame(CTkFrame):
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=1, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="File name :").pack(side="left", padx=(40,0))
-            self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms")
+            if self.backup_name:
+                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms",textvariable=StringVar(value=self.backup_name))
+            else:
+                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms")
             self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=2, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Acquisition time :").pack(side="left", padx=(40,20))
-            self.acquisition_time_entry = CTkEntry(frame, placeholder_text="100.0")
+            self.acquisition_time_entry = CTkEntry(frame, placeholder_text="100.0", textvariable=StringVar(value=acq))
             self.acquisition_time_entry.pack(side="left")
             CTkLabel(frame, text="ms").pack(side="left", padx=5)
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=3, column=0, sticky="nsew", columnspan=2)
-            CTkLabel(frame, text="Number of files to backup :").pack(side="left", padx=(40,10))
-            CTkButton(frame, text="-", width=10, fg_color="transparent").pack(side="left")
-            self.backups_counts_entry = CTkEntry(frame, width=100, placeholder_text="10")
+            CTkLabel(frame, text="Number of files to save :").pack(side="left", padx=(40,10))
+            CTkButton(frame, text="-", width=10, fg_color="transparent", command=lambda: self.increment_entry("-",self.backups_counts_entry)).pack(side="left")
+            self.backups_counts_entry = CTkEntry(frame, width=100, placeholder_text="10", textvariable=StringVar(value=self.backups_counts_memorie))
             self.backups_counts_entry.pack(side="left", padx=1)
-            CTkButton(frame, text="+", width=10, fg_color="transparent").pack(side="left")
+            CTkButton(frame, text="+", width=10, fg_color="transparent", command=lambda: self.increment_entry("+",self.backups_counts_entry)).pack(side="left")
             CTkLabel(frame, text="files").pack(side="left", padx=5)
 
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=4, column=0, sticky="nsew", columnspan=2)
-            CTkLabel(frame, text="Time between backups :").pack(side="left", padx=(40,20))
-            self.interval_time_entry = CTkEntry(frame, placeholder_text="1000")
-            self.interval_time_entry.pack(side="left")
-            CTkLabel(frame, text="ms").pack(side="left", padx=5)
+            CTkLabel(frame, text="Save every").pack(side="left", padx=(40,5))
+            CTkButton(frame, text="-", width=10, fg_color="transparent", command=lambda: self.increment_entry("-",self.save_frequency_entry)).pack(side="left")
+            self.save_frequency_entry = CTkEntry(frame, width=100, placeholder_text="1", textvariable=StringVar(value=self.save_frequency))
+            self.save_frequency_entry.pack(side="left")      
+            CTkButton(frame, text="+", width=10, fg_color="transparent", command=lambda: self.increment_entry("+",self.save_frequency_entry)).pack(side="left")
+            CTkLabel(frame, text="scan").pack(side="left", padx=5)
 
-            self.stop_after_saves = CTkCheckBox(self.popup, text="Stop acquisition time after saves", border_width=2, border_color="#1F6AA5")
-            self.stop_after_saves.grid(row=5, column=0, padx=40, sticky="nsew", columnspan=2)
+            self.stop_after_saves_entry = CTkCheckBox(self.popup, text="Stop spectrometer after saves", border_width=2, border_color="#1F6AA5")
+            self.stop_after_saves_entry.grid(row=5, column=0, padx=40, sticky="nsew", columnspan=2)
+            if self.stop_after_saves: self.stop_after_saves_entry.select()
             CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=6, column=0, padx=(40,20), pady=20, sticky="ew")
-            CTkButton(self.popup, text="Save", command=self.check_all_entry).grid(row=6, column=1, padx=(20,40), pady=20, sticky="ew")
+            CTkButton(self.popup, text="Save", command=self.start_save_thread).grid(row=6, column=1, padx=(20,40), pady=20, sticky="ew")
 
         self.popup.focus_force()
+
+
+    def increment_entry(self, operator, entry):
+        try:
+            val = int(entry.get())
+            if operator == "+":
+                val += 1
+            elif operator == "-" and val > 1:
+                val -= 1
+            entry.configure(textvariable=StringVar(value=val))
+        except:
+            self.notification(f"Must be a positive integer", color="#8e0101")
 
 
     def center_popup(self, size):
@@ -189,25 +215,38 @@ class SpectrometerFrame(CTkFrame):
 
 
     def close_popup(self):
-        self.popup.destroy()
-        self.popup = None
+        if self.popup:
+            self.popup.destroy()
+            self.popup = None
     
 
-    def check_all_entry(self):
+    def is_thread_finished(self):
+        if self.thread_finish:
+            self.spectrometer.acquire_save_data = 0
+            self.close_popup()
+        else:
+            self.after(500, self.is_thread_finished)
+    
+
+    def start_save_thread(self):
         if not self.check_acquisition_time(): return
         if not self.check_backups_counts(): return
-        if not self.check_interval_time(): return
-        wait_before_process = int(self.spectrometer.integration_time /1000 + self.acquisition_time)
-        if not self.spectrometer.is_running:
-            wait_before_process += 1000
+        if not self.check_save_frequency(): return
+
+        self.thread_finish = False
+        self.backup_name = self.backup_name_entry.get()
+        self.stop_after_saves = self.stop_after_saves_entry.get()
+        self.spectrometer.acquire_save_data = self.save_frequency
         self.spectrometer.set_integration_time(self.acquisition_time *1000)
-        self.spectrometer.clear()
-        self.popup.withdraw()
         self.file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time, self.backup_name_entry.get())
         self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
-        self.start_spectrometer()
-        self.after(wait_before_process, self.advanced_save)
+
+        self.popup.withdraw()
+        if not self.spectrometer.is_running: self.start_spectrometer()
         self.notification(f"Serial backup has begun...", color="#006bd2")
+        self.save_thread = threading.Thread(target=self.advanced_save)
+        self.save_thread.start()
+        self.is_thread_finished()
 
 
     def check_acquisition_time(self):
@@ -226,6 +265,7 @@ class SpectrometerFrame(CTkFrame):
     def check_backups_counts(self):
         try:
             self.backups_counts = int(self.backups_counts_entry.get())
+            self.backups_counts_memorie = self.backups_counts
             result = self.backups_counts > 0
             if not result:
                 self.notification(f"The number of backups must be higher than 0", color="#8e0101")
@@ -235,15 +275,15 @@ class SpectrometerFrame(CTkFrame):
             return False
 
 
-    def check_interval_time(self):
+    def check_save_frequency(self):
         try:
-            self.interval_time = int(self.interval_time_entry.get())
-            result = self.interval_time >= self.acquisition_time
+            self.save_frequency = int(self.save_frequency_entry.get())
+            result = self.save_frequency > 0
             if not result:
-                self.notification(f"Time between backup must be bigger than the acquisition time", color="#8e0101")
+                self.notification(f"The number of scan must be higher than 0", color="#8e0101")
             return result
         except:
-            self.notification(f"Time between backups must be an integer", color="#8e0101")
+            self.notification(f"The number of scan must be an integer", color="#8e0101")
             return False
 
 

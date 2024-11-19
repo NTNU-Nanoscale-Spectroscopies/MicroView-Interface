@@ -68,16 +68,16 @@ class MyApp(CTk):
         self.button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command = lambda m=microscope: self.stopDevices(m))
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
-        self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
-        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
-        self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
-        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
-
         self.update_idletasks()
         self.directory_frame = DirectoryFrame(self)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
+
+        self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
+        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
+        self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
+        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
     def findDeviceByType(self, microscope, device_type):
         for device in microscope.devices.values():

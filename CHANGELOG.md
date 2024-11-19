@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2] - 2024-11-19
+### <span style="color:green"> Added </span>
+- Dev : Adding optimisation, spectrometer data can now be saved at maximum speed
+- Dev : In the advanced save section, entries are retained
+- Dev : Adding a delay before starting up devices to smooth window creation
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Spectrometer dark correction activated to remove 1500 counts offset
+### <span style="color:#d6a600"> Changed </span>
+- Dev : In the advanced save section, save interval is replaced by number of scans
+
 ## [0.3.1] - 2024-11-08
 ### <span style="color:green"> Added </span>
 - Dev : Multiple files can be selected at the same time for overlay graphics

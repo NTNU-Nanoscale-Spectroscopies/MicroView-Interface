@@ -21,7 +21,7 @@ class CameraFrame(CTkFrame):
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.camera = camera
-        self.try_connection()
+        self.after(120, self.try_connection)
 
 
     def try_connection(self):

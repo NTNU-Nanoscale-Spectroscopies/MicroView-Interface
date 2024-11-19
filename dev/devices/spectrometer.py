@@ -6,8 +6,10 @@ import queue
 class MySpectrometer(MyDevice):
     def __init__(self, name, serial, enabled = True):
         super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
-        self.data_queue = queue.Queue(maxsize=1)
+        self.chart_queue = queue.Queue(maxsize=1)
+        self.save_queue = queue.Queue()
         self.integration_time = 100000
+        self.acquire_save_data = 0
 
     def connect(self):
         try:
@@ -27,10 +29,16 @@ class MySpectrometer(MyDevice):
 
     def acquire_data(self):
         try:
+            self.index = 0
             print("run", self.is_running)
             while self.is_running:
-                wavelengths, intensities = self.spectrometer.spectrum()
-                self.data_queue.put((wavelengths, intensities))
+                wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=True)
+                self.chart_queue.put((wavelengths, intensities))
+                if self.acquire_save_data > 0:
+                    self.index += 1
+                    if self.index >= self.acquire_save_data:
+                        self.index = 0
+                        self.save_queue.put((wavelengths, intensities))
         except Exception as e:
             print(f"Error in sepectrometer acquisition: {e}")
 
@@ -50,6 +58,3 @@ class MySpectrometer(MyDevice):
         if self.connected:
             self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
-
-    def clear(self):
-        self.data_queue.queue.clear()
