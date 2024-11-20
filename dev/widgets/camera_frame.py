@@ -13,18 +13,20 @@ class CameraFrame(CTkFrame):
         if not camera:
             self.label = CTkLabel(self, text="No camera", font=("Arial", 25))
             self.label.grid(row=3, column=1, padx=5, pady=5)
-            return
+        else:
+            self.camera = camera
+            self.init()
+            self.after(120, self.connect)
 
+
+    def init(self):
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
-        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.try_connection)
+        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.connect)
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
-        self.camera = camera
-        self.after(120, self.try_connection)
 
-
-    def try_connection(self):
+    def connect(self):
         if self.camera.connect():
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
@@ -48,10 +50,18 @@ class CameraFrame(CTkFrame):
             self.save_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
 
             self.current_image = None
+            self.master.quick_setup_frame.check_connected_devices()
             if self.camera.enable: 
                 self.start_camera()
         else:
             self.master.notification(f"Unable to connect to {self.camera.name} {self.camera.serial}", color="#8e0101")
+
+
+    def disconnect(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        self.init()
+        self.on_closing()
 
 
     def start_camera(self):
@@ -118,3 +128,7 @@ class CameraFrame(CTkFrame):
 
     def extend(self):
         self.master.notification(f"Coming soon !", color="#006bd2")
+
+
+    def on_closing(self):
+        self.camera.disconnect()

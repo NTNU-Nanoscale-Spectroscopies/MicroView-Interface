@@ -18,6 +18,7 @@ class MyApp(CTk):
         self.set_windows_scale()
         self.centerWindow(size)
         set_default_color_theme("dev/themes/MyTheme.json")
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
 
     def menu(self):
@@ -79,6 +80,8 @@ class MyApp(CTk):
         self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
+        self.quick_setup_frame.check_connected_devices()
+
     def findDeviceByType(self, microscope, device_type):
         for device in microscope.devices.values():
             if isinstance(device, device_type):
@@ -92,9 +95,9 @@ class MyApp(CTk):
         self.menu()
 
     def notification(self, head_message=None, message=None, color=None):
-        notif = Notification(head_message, message, color)
-        self.notif_list.insert(0, notif)
-        shift = notif.winfo_height() + 8
+        notification = Notification(head_message, message, color)
+        self.notif_list.insert(0, notification)
+        shift = notification.height * self.scale + 8
         for notif in self.notif_list[1:]:
             notif.draw(shift)
             shift += notif.winfo_height() + 10
@@ -110,6 +113,15 @@ class MyApp(CTk):
             dpi = ctypes.windll.gdi32.GetDeviceCaps(hdc, 88)
             user32.ReleaseDC(0, hdc)
             self.scale = dpi / 96
+
+    def on_closing(self):
+        self.notification("Closing in progress, please wait...", color="#006bd2")
+        self.after(300, self.close)
+
+    def close(self):
+        self.spectrometer_frame.on_closing()
+        self.camera_frame.on_closing()
+        self.destroy()
 
 
 class MyMicroscope:

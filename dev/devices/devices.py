@@ -8,11 +8,11 @@ class MyDevice:
         self.connected = False
         self.is_running = False
 
-    def disconnect(self):
-        print("MyDevice disconnect")
+    def connect(self):
+        pass
 
-    def stop(self):
-        print("MyDevice stop")
+    def disconnect(self):
+        pass
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

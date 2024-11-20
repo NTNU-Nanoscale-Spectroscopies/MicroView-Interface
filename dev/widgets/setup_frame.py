@@ -11,6 +11,7 @@ class QuickSetupFrame(CTkScrollableFrame):
     def __init__(self, master, microscope):
         super().__init__(master)
 
+        self.switch_list = []
         for i, device in enumerate(microscope.devices.values()):
 
             frame = CTkFrame(self)
@@ -50,6 +51,7 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MyPlatform): 
                 pass
 
+            self.switch_list.append((switch, device, widget_to_disable))
             switch.configure(command=lambda d=device, s=switch, w=widget_to_disable: self.toggle_device(d,s,w))
 
         self.update_idletasks()
@@ -58,14 +60,32 @@ class QuickSetupFrame(CTkScrollableFrame):
         self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
 
 
+    def check_connected_devices(self):
+        for switch, device, widgets in self.switch_list:
+            if device.connected:
+                switch.select()
+                for widget in widgets:
+                    widget.configure(state="normal")
+            else:
+                switch.deselect()
+
 
     def toggle_device(self, device, switch, widget_to_disable):
         swicth_selected = switch.get()
         state = "normal" if swicth_selected else "disabled"
         for widget in widget_to_disable:
             widget.configure(state=state)
-        if not swicth_selected:
-            device.stop()
+
+        frame = device
+        if isinstance(device, MyCamera):
+            frame = self.master.master.master.camera_frame
+        elif isinstance(device, MySpectrometer):
+            frame = self.master.master.master.spectrometer_frame
+
+        if swicth_selected:
+            frame.connect()
+        else:
+            frame.disconnect()
 
 
     def check_valide_entry(self, device, entry):

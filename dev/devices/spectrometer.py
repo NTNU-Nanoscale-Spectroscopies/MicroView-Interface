@@ -2,6 +2,7 @@ from .devices import MyDevice
 from seabreeze.spectrometers import Spectrometer
 import threading
 import queue
+import time
 
 class MySpectrometer(MyDevice):
     def __init__(self, name, serial, enabled = True):
@@ -23,14 +24,13 @@ class MySpectrometer(MyDevice):
 
     def start(self):
         if self.connected and not self.is_running:
+            self.is_running = True
             self.data_thread = threading.Thread(target=self.acquire_data, daemon=True)
             self.data_thread.start()
-            self.is_running = True
 
     def acquire_data(self):
         try:
             self.index = 0
-            print("run", self.is_running)
             while self.is_running:
                 wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=True)
                 self.chart_queue.put((wavelengths, intensities))
@@ -44,13 +44,11 @@ class MySpectrometer(MyDevice):
 
     def stop(self):
         self.is_running = False
-        if not self.is_running: return
-        if self.data_thread.is_alive():
-            self.data_thread.join()
 
     def disconnect(self):
         if self.connected:
             self.stop()
+            time.sleep(0.2)
             self.spectrometer.close()
             self.connected = False
 

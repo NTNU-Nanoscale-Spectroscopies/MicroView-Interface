@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.3] - 2024-11-20
+### <span style="color:green"> Added </span>
+- Dev : Add static white balance
+- Dev : The connection with the devices is now properly terminated before the program fully closes
+- Dev : Devices can now be connected/disconnected by the setup frame
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Camera finally closes properly
+- Dev : The end-of-execution bug has been resolved by replacing the pyplot library with the figure library
+- Dev : Fix a ghost print for the spectrometer acquisition
+- Dev : Fix the second notification shift
+
 ## [0.3.2] - 2024-11-19
 ### <span style="color:green"> Added </span>
 - Dev : Adding optimisation, spectrometer data can now be saved at maximum speed

@@ -2,9 +2,9 @@ from ..images.images import *
 from .notification import *
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from matplotlib.pyplot import *
+from matplotlib.figure import Figure
 from datetime import *
-import tkinter
+import threading
 import time
 import csv
 
@@ -19,11 +19,16 @@ class SpectrometerFrame(CTkFrame):
         if not spectrometer:
             self.label = CTkLabel(self, text="No spectrometer", font=("Arial", 25))
             self.label.grid(row=3, column=1, padx=5, pady=5)
-            return
+        else:
+            self.spectrometer = spectrometer
+            self.init()
+            self.after(120, self.connect)
 
+
+    def init(self):
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
-        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.try_connection)
+        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.connect)
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.popup = None
@@ -33,21 +38,19 @@ class SpectrometerFrame(CTkFrame):
         self.stop_after_saves = False
         self.save_frequency = 1
         self.backups_counts_memorie = 10
-        self.main_master = master
-        self.spectrometer = spectrometer
-        self.after(120, self.try_connection)
 
 
-    def try_connection(self):
+    def connect(self):
         if self.spectrometer.connect():
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
             self.spectrometer.set_integration_time(self.spectrometer.integration_time)
-            self.figure, self.plot1 = subplots(figsize=(6, 4), dpi=100)
+            self.figure = Figure()
+            self.plot1 = self.figure.subplots()
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
             self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=4)
-            toolbar_frame = tkinter.Frame(self)
+            toolbar_frame = CTkFrame(self)
             toolbar_frame.grid(row=0, column=1, sticky="new")
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
             self.toolbar.update()
@@ -65,10 +68,18 @@ class SpectrometerFrame(CTkFrame):
             self.save_button = CTkButton(self, text="", width=30, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
             self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
 
+            self.master.quick_setup_frame.check_connected_devices()
             if self.spectrometer.enable:
                 self.start_spectrometer()
         else:
             self.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
+
+    
+    def disconnect(self):
+        for widget in self.winfo_children():
+            widget.destroy()
+        self.init()
+        self.on_closing()
 
 
     def start_spectrometer(self):
@@ -244,7 +255,7 @@ class SpectrometerFrame(CTkFrame):
         self.popup.withdraw()
         if not self.spectrometer.is_running: self.start_spectrometer()
         self.notification(f"Serial backup has begun...", color="#006bd2")
-        self.save_thread = threading.Thread(target=self.advanced_save)
+        self.save_thread = threading.Thread(target=self.advanced_save, daemon=True)
         self.save_thread.start()
         self.is_thread_finished()
 
@@ -335,3 +346,8 @@ class SpectrometerFrame(CTkFrame):
     def notification(self, head_message=None, message=None, color=None,):
         self.master.notification(head_message, message, color)
         if self.popup: self.popup.focus_force()
+
+    def on_closing(self):
+        self.backups_counts = 0
+        time.sleep(0.2)
+        self.spectrometer.disconnect()

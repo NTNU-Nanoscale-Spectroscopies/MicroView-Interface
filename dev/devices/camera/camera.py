@@ -48,8 +48,9 @@ class MyCamera(MyDevice):
     def disconnect(self):
         if self.connected:
             self.stop()
-            #self.camera.disarm()
+            self.camera.disarm()
             self.camera.dispose()
+            self.sdk.dispose()
             self.connected = False
 
 
@@ -73,6 +74,9 @@ class ImageAcquisitionThread(threading.Thread):
                 self._camera.get_default_white_balance_matrix(),
                 self._camera.bit_depth
             )
+            self._mono_to_color_processor.red_gain = 0.7
+            self._mono_to_color_processor.green_gain = 1.1
+            self._mono_to_color_processor.blue_gain = 1.63
             self._is_color = True
 
         self._bit_depth = camera.bit_depth
