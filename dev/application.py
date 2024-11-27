@@ -14,6 +14,7 @@ class MyApp(CTk):
         self.microscopes = list(microscopes)
         self.notif_list = []
         self.apparence_color_theme = "light"
+        self.is_menu = True
         self.swicthThemeMode()
         self.set_windows_scale()
         self.centerWindow(size)
@@ -24,7 +25,7 @@ class MyApp(CTk):
     def menu(self):
         for widget in self.winfo_children():
             widget.destroy()
-        self.title(f"Microscope Selector - {self.version}")
+        self.title(f"MicroView")
         self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure((0, 1, 3, 4), weight=0)
@@ -34,6 +35,8 @@ class MyApp(CTk):
         self.label.grid(row=0, column=0, padx=(50, 0), pady=(50, 0), sticky="w")
         self.label = CTkLabel(self, text="Please choose your microscope", font=("Arial", 30))
         self.label.grid(row=1, column=0, padx=(50, 0), pady=(20, 0), sticky="w")
+        self.label = CTkLabel(self, text=self.version, font=("Arial", 15), text_color="grey")
+        self.label.grid(row=3, column=0, padx=10, pady=5, sticky="se")
 
         self.microscopes_frame = MicroscopeFrame(self, [microscope for microscope in self.microscopes])
         self.microscopes_frame.grid(row=2, column=0, padx=50, pady=10, sticky="nsew")
@@ -58,7 +61,6 @@ class MyApp(CTk):
         for widget in self.winfo_children():
             widget.destroy()
         
-        self.title(f"{microscope.name} - Config panel")
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
         self.grid_rowconfigure((1,2), weight=2)
@@ -80,6 +82,7 @@ class MyApp(CTk):
         self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
+        self.is_menu = False
         self.quick_setup_frame.check_connected_devices()
 
     def findDeviceByType(self, microscope, device_type):
@@ -119,8 +122,9 @@ class MyApp(CTk):
         self.after(300, self.close)
 
     def close(self):
-        self.spectrometer_frame.on_closing()
-        self.camera_frame.on_closing()
+        if not self.is_menu:
+            self.spectrometer_frame.on_closing()
+            self.camera_frame.on_closing()
         self.destroy()
 
 

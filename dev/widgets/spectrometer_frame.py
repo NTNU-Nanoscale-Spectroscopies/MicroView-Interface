@@ -22,7 +22,7 @@ class SpectrometerFrame(CTkFrame):
         else:
             self.spectrometer = spectrometer
             self.init()
-            self.after(120, self.connect)
+            self.after(150, self.connect)
 
 
     def init(self):
@@ -345,9 +345,9 @@ class SpectrometerFrame(CTkFrame):
 
     def notification(self, head_message=None, message=None, color=None,):
         self.master.notification(head_message, message, color)
-        if self.popup: self.popup.focus_force()
 
     def on_closing(self):
-        self.backups_counts = 0
-        time.sleep(0.2)
-        self.spectrometer.disconnect()
+        if self.spectrometer:
+            self.backups_counts = 0
+            time.sleep(0.2)
+            self.spectrometer.disconnect()

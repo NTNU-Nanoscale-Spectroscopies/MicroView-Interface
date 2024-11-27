@@ -16,7 +16,7 @@ class CameraFrame(CTkFrame):
         else:
             self.camera = camera
             self.init()
-            self.after(120, self.connect)
+            self.after(150, self.connect)
 
 
     def init(self):
@@ -131,4 +131,5 @@ class CameraFrame(CTkFrame):
 
 
     def on_closing(self):
-        self.camera.disconnect()
+        if self.camera:
+            self.camera.disconnect()

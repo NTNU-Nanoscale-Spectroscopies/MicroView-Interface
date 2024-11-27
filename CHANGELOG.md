@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.4] - 2024-11-27
+### <span style="color:green"> Added </span>
+- Dev : You can now easily create an executable with the :
+    ````bash
+    pyinstaller microview.spec
+    ````
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Troubleshooting when closing a program if a certain element does not exist
+
 ## [0.3.3] - 2024-11-20
 ### <span style="color:green"> Added </span>
 - Dev : Add static white balance
