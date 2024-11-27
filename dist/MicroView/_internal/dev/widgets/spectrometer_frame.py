@@ -22,7 +22,7 @@ class SpectrometerFrame(CTkFrame):
         else:
             self.spectrometer = spectrometer
             self.init()
-            self.after(120, self.connect)
+            self.after(150, self.connect)
 
 
     def init(self):
