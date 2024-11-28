@@ -119,6 +119,7 @@ class MyApp(CTk):
 
     def on_closing(self):
         self.notification("Closing in progress, please wait...", color="#006bd2")
+        self.withdraw()
         self.after(300, self.close)
 
     def close(self):

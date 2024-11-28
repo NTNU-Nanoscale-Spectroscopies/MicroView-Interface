@@ -5,12 +5,13 @@ import queue
 import time
 
 class MySpectrometer(MyDevice):
-    def __init__(self, name, serial, enabled = True):
+    def __init__(self, name, serial, enabled=True, dark_correction=False):
         super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
         self.chart_queue = queue.Queue(maxsize=1)
         self.save_queue = queue.Queue()
         self.integration_time = 100000
         self.acquire_save_data = 0
+        self.dark_correction = dark_correction
 
     def connect(self):
         try:
@@ -32,7 +33,7 @@ class MySpectrometer(MyDevice):
         try:
             self.index = 0
             while self.is_running:
-                wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=True)
+                wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=self.dark_correction)
                 self.chart_queue.put((wavelengths, intensities))
                 if self.acquire_save_data > 0:
                     self.index += 1

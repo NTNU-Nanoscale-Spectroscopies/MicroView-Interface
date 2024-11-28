@@ -68,11 +68,11 @@ class SpectrometerFrame(CTkFrame):
             self.save_button = CTkButton(self, text="", width=30, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
             self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
 
-            self.master.quick_setup_frame.check_connected_devices()
             if self.spectrometer.enable:
                 self.start_spectrometer()
         else:
             self.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
+        self.master.quick_setup_frame.check_connected_devices()
 
     
     def disconnect(self):

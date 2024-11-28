@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1] - 2024-11-28
+### <span style="color:green"> Added </span>
+- Dev : It is now possible to change spectrometer during runtime
+- Dev : Added a variable to adjust black correction based on the spectrometer used
+- Dev : Updating switches based on the connection status of the devices
+- Dev : When closing, the software transitions to hidden mode and continues running in the background until fully closed
+
 ## [0.3.4] - 2024-11-27
 ### <span style="color:green"> Added </span>
 - Dev : You can now easily create an executable with the :

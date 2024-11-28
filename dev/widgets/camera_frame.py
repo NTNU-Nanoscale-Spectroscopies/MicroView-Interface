@@ -50,11 +50,11 @@ class CameraFrame(CTkFrame):
             self.save_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
 
             self.current_image = None
-            self.master.quick_setup_frame.check_connected_devices()
             if self.camera.enable: 
                 self.start_camera()
         else:
             self.master.notification(f"Unable to connect to {self.camera.name} {self.camera.serial}", color="#8e0101")
+        self.master.quick_setup_frame.check_connected_devices()
 
 
     def disconnect(self):

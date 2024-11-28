@@ -81,6 +81,10 @@ class QuickSetupFrame(CTkScrollableFrame):
             frame = self.master.master.master.camera_frame
         elif isinstance(device, MySpectrometer):
             frame = self.master.master.master.spectrometer_frame
+            if frame.spectrometer != device:
+                frame.disconnect()
+                frame.spectrometer = device
+
 
         if swicth_selected:
             frame.connect()
