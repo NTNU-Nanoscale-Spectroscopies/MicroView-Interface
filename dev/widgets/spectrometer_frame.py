@@ -32,12 +32,14 @@ class SpectrometerFrame(CTkFrame):
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.popup = None
-        self.wavelengths = None
-        self.intensities = None
         self.backup_name = None
         self.stop_after_saves = False
         self.save_frequency = 1
         self.backups_counts_memorie = 10
+        self.wavelengths, self.intensities = None, None
+        self.light_reference, self.dark_reference = False, False
+        self.light_reference_wavelengths, self.light_reference_intensities = None, None
+        self.dark_reference_wavelengths, self.dark_reference_intensities = None, None
 
 
     def connect(self):
@@ -59,6 +61,10 @@ class SpectrometerFrame(CTkFrame):
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
             self.import_button = CTkButton(self, text="", width=40, height=40, image=img_plus, fg_color="transparent", command=self.import_chart)
             self.import_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
+            self.light_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_on, fg_color="transparent", command=self.set_light_reference)
+            self.light_reference_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
+            self.dark_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_off, fg_color="transparent", command=self.set_dark_reference)
+            self.dark_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
             self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
             self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
             self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
@@ -106,8 +112,10 @@ class SpectrometerFrame(CTkFrame):
             self.after(20, self.update_graph)
 
 
-    def save_data(self, file_path=None, single_save=True):
-        if self.wavelengths is not None and self.intensities is not None:
+    def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True):
+        wavelengths = wavelengths if wavelengths is not None else self.wavelengths
+        intensities = intensities if intensities is not None else self.intensities
+        if wavelengths is not None and intensities is not None:
             if single_save:
                 file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time)
                 counts = self.master.directory_frame.get_available_iteration(file_path)
@@ -118,7 +126,7 @@ class SpectrometerFrame(CTkFrame):
                         writer = csv.writer(file)
                         writer.writerow(['Wavelength [nm]', ' Intensity [counts]'])
                         writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
-                        writer.writerows(zip(self.wavelengths, self.intensities))
+                        writer.writerows(zip(wavelengths, intensities))
                     if single_save:
                         self.notification(f"Successfully saved as", file_path, "#1a8300")
                         print(f"Data saved successfully to {file_path}")
@@ -138,7 +146,7 @@ class SpectrometerFrame(CTkFrame):
             self.backups_counts -= 1
             self.wavelengths, self.intensities = self.spectrometer.save_queue.get()
             file_name = self.file_path.replace("#", str(self.file_counts)).replace("@", f"{datetime.now():%H.%M.%S}")
-            self.save_data(file_name, False)
+            self.save_data(file_name, single_save=False)
             self.file_counts += 1
 
         if self.stop_after_saves:
@@ -151,8 +159,8 @@ class SpectrometerFrame(CTkFrame):
         if not self.popup:
             self.popup = CTkToplevel(self)
             self.popup.title("Spectrometer - Advanced save")
-            self.popup.minsize(405, 310)
-            self.center_popup((600,380))
+            self.popup.minsize(405, 330)
+            self.center_popup((600,400))
             self.popup.grid_rowconfigure((1,2,3,4,5,6), weight=1)
             self.popup.grid_columnconfigure((0,1), weight=1)
             self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
@@ -198,11 +206,26 @@ class SpectrometerFrame(CTkFrame):
             CTkButton(frame, text="+", width=10, fg_color="transparent", command=lambda: self.increment_entry("+",self.save_frequency_entry)).pack(side="left")
             CTkLabel(frame, text="scan").pack(side="left", padx=5)
 
+            frame = CTkFrame(self.popup, fg_color="transparent")
+            frame.grid(row=5, column=0, sticky="nsew", columnspan=2)
+            self.light_reference_entry = CTkCheckBox(frame, text="Light reference", border_width=2, border_color="#1F6AA5")
+            self.light_reference_entry.pack(side="left", padx=40)
+            self.dark_reference_entry = CTkCheckBox(frame, text="Dark reference", border_width=2, border_color="#1F6AA5")
+            self.dark_reference_entry.pack(side="left", padx=0)
+            if self.light_reference:
+                self.light_reference_entry.select()
+            elif self.light_reference_intensities is None:
+                self.light_reference_entry.configure(state="disabled", border_color="gray45")
+            if self.dark_reference:
+                self.dark_reference_entry.select()
+            elif self.dark_reference_intensities is None:
+                self.dark_reference_entry.configure(state="disabled", border_color="gray45")
+
             self.stop_after_saves_entry = CTkCheckBox(self.popup, text="Stop spectrometer after saves", border_width=2, border_color="#1F6AA5")
-            self.stop_after_saves_entry.grid(row=5, column=0, padx=40, sticky="nsew", columnspan=2)
+            self.stop_after_saves_entry.grid(row=6, column=0, padx=40, sticky="nsew", columnspan=2)
             if self.stop_after_saves: self.stop_after_saves_entry.select()
-            CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=6, column=0, padx=(40,20), pady=20, sticky="ew")
-            CTkButton(self.popup, text="Save", command=self.start_save_thread).grid(row=6, column=1, padx=(20,40), pady=20, sticky="ew")
+            CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=7, column=0, padx=(40,20), pady=20, sticky="ew")
+            CTkButton(self.popup, text="Save", command=self.start_save_thread).grid(row=7, column=1, padx=(20,40), pady=20, sticky="ew")
 
         self.popup.focus_force()
 
@@ -247,12 +270,25 @@ class SpectrometerFrame(CTkFrame):
         self.thread_finish = False
         self.backup_name = self.backup_name_entry.get()
         self.stop_after_saves = self.stop_after_saves_entry.get()
+        self.light_reference = self.light_reference_entry.get()
+        self.dark_reference = self.dark_reference_entry.get()
         self.spectrometer.acquire_save_data = self.save_frequency
         self.spectrometer.set_integration_time(self.acquisition_time *1000)
         self.file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time, self.backup_name_entry.get())
         self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
 
         self.popup.withdraw()
+        reference_path = os.path.dirname(self.file_path)
+        end_file = f"_{self.backup_name}_{self.file_counts}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
+        if self.light_reference:
+            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths, self.light_reference_intensities, False)
+            if self.light_ref_acquisition_time != self.spectrometer.integration_time:
+                self.notification(f"Light reference acquisition time differs from current", color="#e17e00")
+        if self.dark_reference:
+            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths, self.dark_reference_intensities, False)
+            if self.dark_ref_acquisition_time != self.spectrometer.integration_time:
+                self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
+
         if not self.spectrometer.is_running: self.start_spectrometer()
         self.notification(f"Serial backup has begun...", color="#006bd2")
         self.save_thread = threading.Thread(target=self.advanced_save, daemon=True)
@@ -296,6 +332,29 @@ class SpectrometerFrame(CTkFrame):
         except:
             self.notification(f"The number of scan must be an integer", color="#8e0101")
             return False
+
+
+    def set_light_reference(self):
+        self.light_reference_wavelengths, self.light_reference_intensities = self.wavelengths, self.intensities
+        self.light_ref_acquisition_time = self.spectrometer.integration_time
+        if self.light_reference_intensities is not None:
+            self.light_reference = True
+            self.notification(f"Light reference successfully recorded", color="#1a8300")
+        else:
+            self.light_reference = False
+            self.notification(f"There is no data to save for the light reference", color="#8e0101")
+
+
+    def set_dark_reference(self):
+        self.dark_reference_wavelengths, self.dark_reference_intensities = self.wavelengths, self.intensities
+        self.dark_ref_acquisition_time = self.spectrometer.integration_time
+        if self.dark_reference_intensities is not None:
+            self.dark_reference = True
+            self.notification(f"Dark reference successfully recorded", color="#1a8300")
+        else:
+            self.dark_reference = False
+            self.notification(f"There is no data to save for the dark reference", color="#8e0101")
+
 
 
     def import_chart(self):

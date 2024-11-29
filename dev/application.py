@@ -118,7 +118,6 @@ class MyApp(CTk):
             self.scale = dpi / 96
 
     def on_closing(self):
-        self.notification("Closing in progress, please wait...", color="#006bd2")
         self.withdraw()
         self.after(300, self.close)
 

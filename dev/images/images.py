@@ -41,3 +41,5 @@ img_full_screen = load_image((20, 20), 'full_screen_icon_black.png', 'full_scree
 img_retry = load_image((25, 25), 'retry_icon_grey.png')
 img_info = load_image((15, 15), 'info_icon_black.png', 'info_icon_white.png')
 img_plus = load_image((15, 15), 'plus_icon_black.png', 'plus_icon_white.png')
+img_bulb_on = load_image((25, 25), 'bulb_on_icon_black.png', 'bulb_on_icon_white.png')
+img_bulb_off = load_image((25, 25), 'bulb_off_icon_black.png', 'bulb_off_icon_white.png')

@@ -26,9 +26,7 @@ class QuickSetupFrame(CTkScrollableFrame):
                 state = "normal"
 
             if isinstance(device, MyCamera): 
-                button = CTkButton(frame, text="Calibrate", state=state)
-                button.pack(side="left", padx=10, pady=5)
-                widget_to_disable.append(button)
+                pass
                 
             elif isinstance(device, MySpectrometer): 
                 entry = CTkEntry(frame, width=100, placeholder_text="100.0")

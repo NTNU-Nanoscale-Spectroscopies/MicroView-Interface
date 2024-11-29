@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2] - 2024-11-29
+### <span style="color:green"> Added </span>
+- Dev : Adds the ability to save light and dark references
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : Remove white calibration button from the camera
+- Dev : Remove software close notification
+
 ## [1.0.1] - 2024-11-28
 ### <span style="color:green"> Added </span>
 - Dev : It is now possible to change spectrometer during runtime
