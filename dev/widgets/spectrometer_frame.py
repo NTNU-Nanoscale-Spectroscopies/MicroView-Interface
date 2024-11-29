@@ -5,6 +5,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from matplotlib.figure import Figure
 from datetime import *
 import threading
+import numpy
 import time
 import csv
 
@@ -34,6 +35,7 @@ class SpectrometerFrame(CTkFrame):
         self.popup = None
         self.backup_name = None
         self.stop_after_saves = False
+        self.reflectance_mode = False
         self.save_frequency = 1
         self.backups_counts_memorie = 10
         self.wavelengths, self.intensities = None, None
@@ -43,7 +45,7 @@ class SpectrometerFrame(CTkFrame):
 
 
     def connect(self):
-        if self.spectrometer.connect():
+        if self.spectrometer.connect() or True:
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
@@ -65,14 +67,18 @@ class SpectrometerFrame(CTkFrame):
             self.light_reference_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
             self.dark_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_off, fg_color="transparent", command=self.set_dark_reference)
             self.dark_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
-            self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
+            self.play_button = CTkButton(self, text="", width=40, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
             self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-            self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
+            self.pause_button = CTkButton(self, text="", width=40, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
             self.pause_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
-            self.save_button = CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_data)
+            self.save_button = CTkButton(self, text="", width=40, height=40, image=img_save, fg_color="transparent", command=self.save_data)
             self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
-            self.save_button = CTkButton(self, text="", width=30, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
+            self.save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
             self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
+            self.reflectance_data_button = CTkButton(self, text="%", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
+            self.reflectance_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
+            self.raw_data_button = CTkButton(self, text="#", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
+            self.raw_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
 
             if self.spectrometer.enable:
                 self.start_spectrometer()
@@ -99,20 +105,47 @@ class SpectrometerFrame(CTkFrame):
         self.play_button.lift()
 
 
+    def toggle_mode(self):
+        if self.reflectance_mode:
+            self.reflectance_mode = False
+            self.raw_data_button.lift()
+        else:
+            if not self.light_reference or not self.dark_reference:
+                self.notification(f"To use reflectance or transmittance, you need both light and dark references", color="#8e0101")
+                return
+            self.reflectance_mode = True
+            self.reflectance_data_button.lift()
+            if self.light_ref_acquisition_time != self.dark_ref_acquisition_time:
+                self.notification(f"Light reference acquisition time differs from dark", color="#e17e00")              
+            if self.light_ref_acquisition_time != self.spectrometer.integration_time:
+                self.notification(f"Light reference acquisition time differs from current", color="#e17e00")              
+            if self.dark_ref_acquisition_time != self.spectrometer.integration_time:
+                self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")              
+
+
     def update_graph(self):
         if self.spectrometer.is_running:
             if not self.spectrometer.chart_queue.empty():
                 self.wavelengths, self.intensities = self.spectrometer.chart_queue.get()
                 self.plot1.clear()
-                self.plot1.plot(self.wavelengths, self.intensities)
+                if self.reflectance_mode:
+                    denominator = self.light_reference_intensities - self.dark_reference_intensities
+                    denominator = numpy.where(denominator == 0, numpy.nan, denominator)
+                    self.reflectance_intensities = (self.intensities - self.dark_reference_intensities) / denominator * 100
+                    intensities = self.reflectance_intensities
+                    self.plot1.set_ylabel('Relative intensity [%]')
+                    self.plot1.set_ylim(-20, 180)
+                else:
+                    intensities = self.intensities
+                    self.plot1.set_ylabel('Intensity [counts]')
+                self.plot1.plot(self.wavelengths, intensities)
                 self.plot1.set_xlabel('Wavelength [nm]')
-                self.plot1.set_ylabel('Intensity [counts]')
                 self.plot1.grid()
                 self.canvas.draw()
             self.after(20, self.update_graph)
 
 
-    def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True):
+    def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):
         wavelengths = wavelengths if wavelengths is not None else self.wavelengths
         intensities = intensities if intensities is not None else self.intensities
         if wavelengths is not None and intensities is not None:
@@ -127,6 +160,17 @@ class SpectrometerFrame(CTkFrame):
                         writer.writerow(['Wavelength [nm]', ' Intensity [counts]'])
                         writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
                         writer.writerows(zip(wavelengths, intensities))
+                    if self.reflectance_mode and not reference:
+                        denominator = self.light_reference_intensities - self.dark_reference_intensities
+                        denominator = numpy.where(denominator == 0, numpy.nan, denominator)
+                        intensities = (intensities - self.dark_reference_intensities) / denominator * 100
+                        directory, filename = os.path.split(file_path)
+                        file_path = f"{directory}/relative_{filename}"
+                        with open(file_path, mode='w', newline='') as file:
+                            writer = csv.writer(file)
+                            writer.writerow(['Wavelength [nm]', ' Relative intensity [%]'])
+                            writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
+                            writer.writerows(zip(wavelengths, intensities))
                     if single_save:
                         self.notification(f"Successfully saved as", file_path, "#1a8300")
                         print(f"Data saved successfully to {file_path}")
@@ -279,13 +323,13 @@ class SpectrometerFrame(CTkFrame):
 
         self.popup.withdraw()
         reference_path = os.path.dirname(self.file_path)
-        end_file = f"_{self.backup_name}_{self.file_counts}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
+        end_file = f"_{self.backup_name}_{str(self.file_counts)}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
         if self.light_reference:
-            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths, self.light_reference_intensities, False)
+            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths, self.light_reference_intensities, False, True)
             if self.light_ref_acquisition_time != self.spectrometer.integration_time:
                 self.notification(f"Light reference acquisition time differs from current", color="#e17e00")
         if self.dark_reference:
-            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths, self.dark_reference_intensities, False)
+            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths, self.dark_reference_intensities, False, True)
             if self.dark_ref_acquisition_time != self.spectrometer.integration_time:
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
 
@@ -363,9 +407,15 @@ class SpectrometerFrame(CTkFrame):
         if file_paths:
             if len(self.plot1.lines) == 1:
                 self.plot1.clear()
-                self.plot1.plot(self.wavelengths, self.intensities, label="Current")
+                if self.reflectance_mode:
+                    intensities = self.reflectance_intensities
+                    self.plot1.set_ylabel('Relative intensity [%]')
+                else:
+                    intensities = self.intensities
+                    self.plot1.set_ylabel('Intensity [counts]')
+
+                self.plot1.plot(self.wavelengths, intensities, label="Current")
                 self.plot1.set_xlabel('Wavelength [nm]')
-                self.plot1.set_ylabel('Intensity [counts]')
                 self.plot1.grid()
             
             for file_path in file_paths:

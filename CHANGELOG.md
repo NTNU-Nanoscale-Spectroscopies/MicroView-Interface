@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.3] - 2024-11-29
+### <span style="color:green"> Added </span>
+- Dev : It is now possible to display reflectance or transmittance
+- Dev : It is now possible to save reflectance or transmittance data
+
 ## [1.0.2] - 2024-11-29
 ### <span style="color:green"> Added </span>
 - Dev : Adds the ability to save light and dark references

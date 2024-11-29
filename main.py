@@ -18,5 +18,5 @@ lm_microscope = MyMicroscope("Lise Meitner",
     lm_filter_12 = MyFilter("Filter 12", "xxxx"),
     lm_platform = MyPlatform("Platform", "xxxx"))
 
-app = MyApp("V1.0.2", (1200, 700), gm_microscope, lm_microscope)
+app = MyApp("V1.0.3", (1200, 700), gm_microscope, lm_microscope)
 app.mainloop()
