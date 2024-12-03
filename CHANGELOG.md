@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.4] - 2024-12-03
+### <span style="color:green"> Added </span>
+- Dev : Adds a connection to the shutter device
+- Dev : White light shutter control now possible
+
 ## [1.0.3] - 2024-11-29
 ### <span style="color:green"> Added </span>
 - Dev : It is now possible to display reflectance or transmittance

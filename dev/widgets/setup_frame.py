@@ -49,6 +49,12 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MyPlatform): 
                 pass
 
+            elif isinstance(device, MyWhiteLight): 
+                button = CTkButton(frame, text="Close", state=state, width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
+                button.configure(command=lambda d=device, w=button: self.toggle_shutter(d,w))
+                button.pack(side="left")
+                widget_to_disable.append(button)
+
             self.switch_list.append((switch, device, widget_to_disable))
             switch.configure(command=lambda d=device, s=switch, w=widget_to_disable: self.toggle_device(d,s,w))
 
@@ -83,11 +89,19 @@ class QuickSetupFrame(CTkScrollableFrame):
                 frame.disconnect()
                 frame.spectrometer = device
 
-
         if swicth_selected:
             frame.connect()
         else:
             frame.disconnect()
+
+
+    def toggle_shutter(self, device, widget):
+        if device.state():    
+            device.close()
+            widget.configure(text="Close", border_color="#920000", hover_color="#4b0000")
+        else:
+            device.open()
+            widget.configure(text="Open", border_color="#009200", hover_color="#004b00")
 
 
     def check_valide_entry(self, device, entry):

@@ -45,7 +45,7 @@ class SpectrometerFrame(CTkFrame):
 
 
     def connect(self):
-        if self.spectrometer.connect() or True:
+        if self.spectrometer.connect():
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
