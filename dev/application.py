@@ -8,21 +8,24 @@ import ctypes
 
 
 class MyApp(CTk):
-    def __init__(self, version, size, *microscopes):
+    def __init__(self, version, size, visible_notif_time, backup_directory, *microscopes):
         super().__init__()
         self.version = version
         self.microscopes = list(microscopes)
+        self.visible_notif_time = visible_notif_time
+        self.backup_directory = backup_directory
         self.notif_list = []
         self.apparence_color_theme = "light"
         self.is_menu = True
-        self.swicthThemeMode()
+        self.swicth_theme_mode()
         self.set_windows_scale()
-        self.centerWindow(size)
+        self.center_window(size)
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
 
     def menu(self):
+        self.selected_microscope = None
         for widget in self.winfo_children():
             widget.destroy()
         self.title(f"MicroView")
@@ -41,23 +44,24 @@ class MyApp(CTk):
         self.microscopes_frame = MicroscopeFrame(self, [microscope for microscope in self.microscopes])
         self.microscopes_frame.grid(row=2, column=0, padx=50, pady=10, sticky="nsew")
 
-        self.button = CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicthThemeMode)
+        self.button = CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicth_theme_mode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
         self.update_idletasks()
 
 
-    def swicthThemeMode(self):
+    def swicth_theme_mode(self):
         self.apparence_color_theme = "light" if self.apparence_color_theme == "dark" else "dark"
         set_appearance_mode(self.apparence_color_theme)
 
 
-    def centerWindow(self, size):
+    def center_window(self, size):
         x = int((self.winfo_screenwidth()/2) - (size[0]/2))
         y = int((self.winfo_screenheight()/2) - (size[1]/2))
         self.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
 
 
-    def goToMicroscope(self, microscope):
+    def go_to_microscope(self, microscope):
+        self.selected_microscope = microscope
         for widget in self.winfo_children():
             widget.destroy()
         
@@ -68,37 +72,36 @@ class MyApp(CTk):
 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
-        self.button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command = lambda m=microscope: self.stopDevices(m))
+        self.button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.stop_devices)
         self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
 
-        self.update_idletasks()
-        self.directory_frame = DirectoryFrame(self)
+        self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
+        self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
+        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
+        self.spectrometer_frame = SpectrometerFrame(self, self.find_device_by_type(microscope, MySpectrometer))
+        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
-
-        self.camera_frame = CameraFrame(self, self.findDeviceByType(microscope, MyCamera))
-        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
-        self.spectrometer_frame = SpectrometerFrame(self, self.findDeviceByType(microscope, MySpectrometer))
-        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
 
         self.is_menu = False
         self.quick_setup_frame.check_connected_devices()
 
-    def findDeviceByType(self, microscope, device_type):
-        for device in microscope.devices.values():
+    def find_device_by_type(self, microscope, device_type):
+        for device in microscope.devices:
             if isinstance(device, device_type):
                 return device
         return None
 
-    def stopDevices(self, microscope):
-        for device in microscope.devices.values():
+    def stop_devices(self):
+        if not self.selected_microscope: return
+        for device in self.selected_microscope.devices:
             device.disconnect()
         self.notif_list = []
         self.menu()
 
     def notification(self, head_message=None, message=None, color=None):
-        notification = Notification(head_message, message, color)
+        notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time)
         self.notif_list.insert(0, notification)
         shift = notification.height * self.scale + 8
         for notif in self.notif_list[1:]:
@@ -125,13 +128,14 @@ class MyApp(CTk):
         if not self.is_menu:
             self.spectrometer_frame.on_closing()
             self.camera_frame.on_closing()
+        self.stop_devices()
         self.destroy()
 
 
 class MyMicroscope:
-    def __init__(self, name, **devices):
+    def __init__(self, name, *devices):
         self.name = name
-        self.devices = devices
+        self.devices = list(devices)
 
     def __repr__(self):
-        return f"Devices in the {self.name} microscope :\n\t" + "\n\t".join([f"{device}" for key, device in self.devices.items()]) + "\n"
+        return f"Devices in the {self.name} microscope :\n\t" + "\n\t".join([f"{device}" for device in self.devices]) + "\n"

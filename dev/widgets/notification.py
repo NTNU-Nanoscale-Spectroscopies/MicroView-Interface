@@ -3,9 +3,10 @@ import sys
 
 class Notification(CTkToplevel):
     
-    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3000, alpha=0.90, width=400, height=50, corner_radius=25, border_width=2, cancel_button=True, **kwargs):
+    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3, alpha=0.90, width=400, height=50, corner_radius=25, border_width=2, cancel_button=True, **kwargs):
         super().__init__()
 
+        time_before_delete = int(time_before_delete*1000)
         self.overrideredirect(True)
         self.alpha = alpha
         self.attributes('-alpha', 0)

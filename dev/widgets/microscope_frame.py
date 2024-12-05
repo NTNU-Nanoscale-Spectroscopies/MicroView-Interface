@@ -9,7 +9,7 @@ class MicroscopeFrame(CTkFrame):
         self.buttons = []
 
         for i, microscope in enumerate(self.microscopes):
-            button = CTkButton(self, text=microscope.name, width=300, height=300, image=img_microscope, compound="top", font=("Arial", 20), text_color=["grey14","grey90"], command= lambda m=microscope: master.goToMicroscope(m))
+            button = CTkButton(self, text=microscope.name, width=300, height=300, image=img_microscope, compound="top", font=("Arial", 20), text_color=["grey14","grey90"], command= lambda m=microscope: master.go_to_microscope(m))
             button.grid(row=0, column=i, padx=10, pady=10)
             self.grid_columnconfigure(i, weight=1)
             self.buttons.append(button)

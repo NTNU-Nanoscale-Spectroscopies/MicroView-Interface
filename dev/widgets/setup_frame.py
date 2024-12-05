@@ -2,7 +2,7 @@ from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
 from ..devices.spectrometer import *
-from ..devices.whitelight import *
+from ..devices.shutter.shutter import *
 from ..devices.laser import *
 from ..devices.filter import *
 from ..devices.platform import *
@@ -12,87 +12,108 @@ class QuickSetupFrame(CTkScrollableFrame):
         super().__init__(master)
 
         self.switch_list = []
-        for i, device in enumerate(microscope.devices.values()):
+        for i, device in enumerate(microscope.devices):
 
             frame = CTkFrame(self)
             frame.grid(row=i, column=0, sticky="nsew")
             switch = CTkSwitch(frame, text=device.name, font=("Arial", 20))
             switch.pack(side="left", padx=(30,10), pady=20)
 
-            state = "disabled"
+            master_frame = None
             widget_to_disable = []
-            if device.enable and device.connected:
-                switch.select()
-                state = "normal"
 
-            if isinstance(device, MyCamera): 
-                pass
+            if isinstance(device, MyCamera):
+                master_frame = self.master.master.master.camera_frame
                 
-            elif isinstance(device, MySpectrometer): 
-                entry = CTkEntry(frame, width=100, placeholder_text="100.0")
-                button = CTkButton(frame, text="Set", width=30, state=state, command=lambda d=device, e=entry: self.check_valide_entry(d,e))
+            elif isinstance(device, MySpectrometer):
+                master_frame = self.master.master.master.spectrometer_frame
+                entry = CTkEntry(frame, width=100, placeholder_text=device.integration_time/1000)
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valide_entry(d,e))
                 label = CTkLabel(frame, text="ms")
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
                 label.pack(side="left", padx=3)
-                entry.configure(state=state)
+                entry.configure(state="disabled")
                 widget_to_disable.append(button)
                 widget_to_disable.append(entry)
 
-            elif isinstance(device, MyLaser): 
-                button = CTkButton(frame, text="", corner_radius=50, width=15, image=img_info, fg_color="transparent")
-                button.pack(side="left")
+            elif isinstance(device, MyLaser):
+                info = CTkButton(frame, text="", corner_radius=50, width=15, image=img_info, fg_color="transparent")
+                info.pack(side="left")
+                widget_to_disable.append(info)
+                if device.shutter:
+                    button = CTkButton(frame, text="Close", state="disabled", width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
+                    button.configure(command=lambda d=device.shutter, b=button: self.toggle_shutter(d,b))
+                    button.pack(side="left")
+                    widget_to_disable.append(button)
 
-            elif isinstance(device, MyFilter): 
+            elif isinstance(device, MyFilter):
                 pass
 
-            elif isinstance(device, MyPlatform): 
+            elif isinstance(device, MyPlatform):
                 pass
 
-            elif isinstance(device, MyWhiteLight): 
-                button = CTkButton(frame, text="Close", state=state, width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
-                button.configure(command=lambda d=device, w=button: self.toggle_shutter(d,w))
+            elif isinstance(device, MyShutter):
+                button = CTkButton(frame, text="Close", state="disabled", width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
+                button.configure(command=lambda d=device, b=button: self.toggle_shutter(d,b))
                 button.pack(side="left")
                 widget_to_disable.append(button)
 
-            self.switch_list.append((switch, device, widget_to_disable))
-            switch.configure(command=lambda d=device, s=switch, w=widget_to_disable: self.toggle_device(d,s,w))
+            self.switch_list.append((switch, device, master_frame, widget_to_disable))
+            switch.configure(command=lambda d=device, s=switch, m=master_frame: self.toggle_device(d,s,m))
 
         self.update_idletasks()
         self.required_height_for_scrollbar = (i+1) * frame.winfo_height()
         self.previous_frame_height = self.master.winfo_height()
         self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
+        self.after(200, self.init)
+
+
+    def init(self):
+        spectrometer_already_open = False
+        for switch, device, master_frame, widget_to_disable in self.switch_list:
+            if isinstance(device, MySpectrometer) and spectrometer_already_open: continue
+            element = master_frame or device
+            if not element.connect():
+                self.notification(f"Unable to connect to {device.name} {device.serial}", color="#8e0101")
+            elif isinstance(device, MySpectrometer):
+                spectrometer_already_open = True
+        self.check_connected_devices()
 
 
     def check_connected_devices(self):
-        for switch, device, widgets in self.switch_list:
+        for switch, device, master_frame, widget_to_disable in self.switch_list:
             if device.connected:
                 switch.select()
-                for widget in widgets:
-                    widget.configure(state="normal")
+                state = "normal"
             else:
                 switch.deselect()
+                state = "disabled"
+
+            for widget in widget_to_disable:
+                widget.configure(state=state)
 
 
-    def toggle_device(self, device, switch, widget_to_disable):
-        swicth_selected = switch.get()
-        state = "normal" if swicth_selected else "disabled"
-        for widget in widget_to_disable:
-            widget.configure(state=state)
+    def toggle_device(self, device, switch, master_frame):
+        element = master_frame or device
+        if isinstance(device, MySpectrometer):
+            if element.spectrometer != device:
+                element.disconnect()
+                element.spectrometer = device
 
-        frame = device
-        if isinstance(device, MyCamera):
-            frame = self.master.master.master.camera_frame
-        elif isinstance(device, MySpectrometer):
-            frame = self.master.master.master.spectrometer_frame
-            if frame.spectrometer != device:
-                frame.disconnect()
-                frame.spectrometer = device
-
-        if swicth_selected:
-            frame.connect()
+        if switch.get():
+            if not element.connect():
+                self.notification(f"Unable to connect to {device.name} {device.serial}", color="#8e0101")
         else:
-            frame.disconnect()
+            element.disconnect()
+        self.check_connected_devices()
+
+
+    def reconnection(self, frame_device):
+        for switch, device, master_frame, widget_to_disable in self.switch_list:
+            if device == frame_device:
+                switch.select()
+                self.toggle_device(device, switch, master_frame)
 
 
     def toggle_shutter(self, device, widget):

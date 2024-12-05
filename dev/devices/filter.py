@@ -1,6 +1,16 @@
-from .devices import MyDevice
+class MyFilter():
+    def __init__(self, name, serial, enable=False):
+        self.name = name
+        self.serial = serial
+        self.enable = enable
+        self.connected = False
+        self.is_running = False
 
+    def connect(self):
+        pass
 
-class MyFilter(MyDevice):
-    def __init__(self, name, serial, enabled = True):
-        super().__init__(name, serial, "ThorFilter", None, enabled)
+    def disconnect(self):
+        pass
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"

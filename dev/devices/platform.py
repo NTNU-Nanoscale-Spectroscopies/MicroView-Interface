@@ -1,6 +1,16 @@
-from .devices import MyDevice
+class MyPlatform():
+    def __init__(self, name, serial, enable=False):
+        self.name = name
+        self.serial = serial
+        self.enable = enable
+        self.connected = False
+        self.is_running = False
 
+    def connect(self):
+        pass
 
-class MyPlatform(MyDevice):
-    def __init__(self, name, serial, enabled = True):
-        super().__init__(name, serial, "ThorPlatform", "edtiable", enabled)
+    def disconnect(self):
+        pass
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"

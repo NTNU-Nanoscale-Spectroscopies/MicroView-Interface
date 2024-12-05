@@ -1,4 +1,3 @@
-from ..devices import MyDevice
 from .windows_setup import configure_path
 from .camera_sdk.tl_camera import TLCameraSDK
 from .camera_sdk.tl_camera_enums import SENSOR_TYPE
@@ -9,9 +8,13 @@ import threading
 import queue
 configure_path()
 
-class MyCamera(MyDevice):
-    def __init__(self, name, serial, enabled=True):
-        super().__init__(name, serial, "ThorCam", "editable", enabled)
+class MyCamera():
+    def __init__(self, name, serial, enable=False):
+        self.name = name
+        self.serial = serial
+        self.enable = enable
+        self.connected = False
+        self.is_running = False
         self.image_acquisition_thread = None
 
     def connect(self):
@@ -27,7 +30,7 @@ class MyCamera(MyDevice):
                 self.camera.issue_software_trigger()
                 self.connected = self.sdk._is_sdk_open
         except Exception as e:
-            print(f"Unable to connect to “{self.name}” device with serial number “{self.serial}” : {e}")
+            pass
         return self.connected
     
 
@@ -52,6 +55,9 @@ class MyCamera(MyDevice):
             self.camera.dispose()
             self.sdk.dispose()
             self.connected = False
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"
 
 
 class ImageAcquisitionThread(threading.Thread):

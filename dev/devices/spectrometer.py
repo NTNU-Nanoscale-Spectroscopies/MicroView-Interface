@@ -1,26 +1,30 @@
-from .devices import MyDevice
 from seabreeze.spectrometers import Spectrometer
 import threading
 import queue
 import time
 
-class MySpectrometer(MyDevice):
-    def __init__(self, name, serial, enabled=True, dark_correction=False):
-        super().__init__(name, serial, "OceanSepctrometer", "edtiable", enabled)
+class MySpectrometer():
+    def __init__(self, name, serial, enable=False, dark_correction=False, integration_time=100):
+        self.name = name
+        self.serial = serial
+        self.enable = enable
+        self.connected = False
+        self.is_running = False
+        
         self.chart_queue = queue.Queue(maxsize=1)
         self.save_queue = queue.Queue()
-        self.integration_time = 100000
+        self.integration_time = integration_time*1000
         self.acquire_save_data = 0
         self.dark_correction = dark_correction
 
     def connect(self):
+        self.connected = False
+        self.is_running = False
         try:
             self.spectrometer = Spectrometer.from_serial_number(self.serial)
             self.connected = True
-            self.is_running = False
         except Exception as e:
-            print(f"Unable to connect to “{self.name}” device with serial number “{self.serial}” : {e}")
-            self.connected = False
+            pass
         return self.connected
 
     def start(self):
@@ -57,3 +61,6 @@ class MySpectrometer(MyDevice):
         if self.connected:
             self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"

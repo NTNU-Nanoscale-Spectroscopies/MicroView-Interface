@@ -38,7 +38,7 @@ After making your modifications, you can build the project into an executable ap
 ````bash
 pyinstaller microview.spec
 ````
-The executable will be located in the ````/dist/MicroView```` folder within your project directory.
+The executable will be located in the `/dist` folder within your project directory.
 
 
 ## Contributors

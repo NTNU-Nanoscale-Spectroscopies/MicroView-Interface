@@ -23,13 +23,12 @@ class SpectrometerFrame(CTkFrame):
         else:
             self.spectrometer = spectrometer
             self.init()
-            self.after(150, self.connect)
 
 
     def init(self):
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
-        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.connect)
+        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
         self.popup = None
@@ -82,9 +81,12 @@ class SpectrometerFrame(CTkFrame):
 
             if self.spectrometer.enable:
                 self.start_spectrometer()
-        else:
-            self.notification(f"Unable to connect to {self.spectrometer.name} {self.spectrometer.serial}", color="#8e0101")
-        self.master.quick_setup_frame.check_connected_devices()
+
+        return self.spectrometer.connected
+
+
+    def reconnection(self):
+        self.master.quick_setup_frame.reconnection(self.spectrometer)
 
     
     def disconnect(self):

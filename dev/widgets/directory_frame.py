@@ -3,12 +3,12 @@ from datetime import *
 
 
 class DirectoryFrame(CTkFrame):
-    def __init__(self, master):
+    def __init__(self, master, backup_directory):
         super().__init__(master, height=10)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure((0,1), weight=1)
         self.grid_propagate(False)
-        self.base_directory = "/Users/A068/Desktop/Data"
+        self.base_directory = backup_directory
 
         self.label = CTkLabel(self, text="Camera backup name :", font=("Arial", 14))
         self.label.grid(row=0, column=0, padx=(20,0), pady=(20,5), sticky="sw")

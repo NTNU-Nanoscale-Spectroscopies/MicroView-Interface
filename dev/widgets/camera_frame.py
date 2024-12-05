@@ -16,13 +16,12 @@ class CameraFrame(CTkFrame):
         else:
             self.camera = camera
             self.init()
-            self.after(150, self.connect)
 
 
     def init(self):
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
-        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.connect)
+        self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
         self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
 
 
@@ -52,9 +51,12 @@ class CameraFrame(CTkFrame):
             self.current_image = None
             if self.camera.enable: 
                 self.start_camera()
-        else:
-            self.master.notification(f"Unable to connect to {self.camera.name} {self.camera.serial}", color="#8e0101")
-        self.master.quick_setup_frame.check_connected_devices()
+
+        return self.camera.connected
+
+
+    def reconnection(self):
+        self.master.quick_setup_frame.reconnection(self.camera)
 
 
     def disconnect(self):
