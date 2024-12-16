@@ -10,9 +10,9 @@ class DirectoryFrame(CTkFrame):
         self.grid_propagate(False)
         self.base_directory = backup_directory
 
-        self.label = CTkLabel(self, text="Camera backup name :", font=("Arial", 14))
+        self.label = CTkLabel(self, text="Camera save file name :", font=("Arial", 14))
         self.label.grid(row=0, column=0, padx=(20,0), pady=(20,5), sticky="sw")
-        self.label = CTkLabel(self, text="Spectrometer backup name :", font=("Arial", 14))
+        self.label = CTkLabel(self, text="Spectrometer save file name :", font=("Arial", 14))
         self.label.grid(row=1, column=0, padx=(20,0), pady=(5,20), sticky="w")
 
         time = f"{datetime.now():%Y%m%d_%H.%M.%S}"

@@ -17,9 +17,11 @@ class MyApp(CTk):
         self.notif_list = []
         self.apparence_color_theme = "light"
         self.is_menu = True
+        self.popup = None
         self.swicth_theme_mode()
         self.set_windows_scale()
-        self.center_window(size)
+        dimension = self.center_window(size[0], size[1])
+        self.geometry(dimension)
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
@@ -54,10 +56,10 @@ class MyApp(CTk):
         set_appearance_mode(self.apparence_color_theme)
 
 
-    def center_window(self, size):
-        x = int((self.winfo_screenwidth()/2) - (size[0]/2))
-        y = int((self.winfo_screenheight()/2) - (size[1]/2))
-        self.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
+    def center_window(self, width, height):
+        x = int((self.winfo_screenwidth()/2) - (width/2))
+        y = int((self.winfo_screenheight()/2) - (height/2))
+        return f"{width}x{height}+{x}+{y}"
 
 
     def go_to_microscope(self, microscope):
@@ -72,8 +74,10 @@ class MyApp(CTk):
 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
         self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
-        self.button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.stop_devices)
-        self.button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
+        self.back_button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.stop_devices)
+        self.back_button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
+        self.settings_button = CTkButton(self, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
+        self.settings_button.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="e")
 
         self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
@@ -86,6 +90,62 @@ class MyApp(CTk):
 
         self.is_menu = False
         self.quick_setup_frame.check_connected_devices()
+
+
+    def settings_popup(self):
+        if not self.popup:
+            self.popup = CTkToplevel(self)
+            self.popup.title("Settings")
+            self.popup.minsize(405, 200)
+            dimension = self.center_window(600, 250)
+            self.popup.geometry(dimension)
+            self.popup.grid_rowconfigure((1,2), weight=1)
+            self.popup.grid_columnconfigure((0,1), weight=1)
+            self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
+            self.popup.attributes("-topmost", True)
+            self.after(50, lambda: self.popup.attributes("-topmost", False))
+
+            title = CTkLabel(self.popup, text="Please configure the following :", font=("Arial", 20))
+            title.grid(row=0, column=0, padx=(40,0), pady=(30,20), sticky="w", columnspan=2)
+
+            frame = CTkFrame(self.popup, fg_color="transparent")
+            frame.grid(row=1, column=0, sticky="nsew", columnspan=2)
+            CTkLabel(frame, text="Visible notification time :").pack(side="left", padx=(40,20))
+            self.visible_notif_time_entry = CTkEntry(frame, placeholder_text="3.0", width=80, textvariable=StringVar(value=self.visible_notif_time/1))
+            self.visible_notif_time_entry.pack(side="left")
+            CTkLabel(frame, text="s").pack(side="left", padx=5)
+
+            frame = CTkFrame(self.popup, fg_color="transparent")
+            frame.grid(row=2, column=0, sticky="nsew", columnspan=2)
+            CTkLabel(frame, text="Backup directory :").pack(side="left", padx=(40,0))
+            self.backup_name_entry = CTkEntry(frame, placeholder_text=self.backup_directory, textvariable=StringVar(value=self.backup_directory))
+            self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
+
+            CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=3, column=0, padx=(40,20), pady=20, sticky="ew")
+            CTkButton(self.popup, text="Save", command=self.save_settings).grid(row=3, column=1, padx=(20,40), pady=20, sticky="ew")
+        
+        self.popup.focus_force()
+
+
+    def close_popup(self):
+        if self.popup:
+            self.popup.destroy()
+            self.popup = None
+
+
+    def save_settings(self):
+        try:
+            if float(self.visible_notif_time_entry.get()) <= 0:
+                self.notification(f"Visible notification time must be positive", color="#8e0101")
+                return
+        except:
+            self.notification(f"Visible notification time must be a number", color="#8e0101")
+            return
+
+        self.visible_notif_time = float(self.visible_notif_time_entry.get())
+        self.backup_directory = self.backup_name_entry.get()
+        self.close_popup()
+        
 
     def find_device_by_type(self, microscope, device_type):
         for device in microscope.devices:

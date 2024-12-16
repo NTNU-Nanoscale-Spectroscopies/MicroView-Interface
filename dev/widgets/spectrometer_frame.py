@@ -66,10 +66,10 @@ class SpectrometerFrame(CTkFrame):
             self.light_reference_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
             self.dark_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_off, fg_color="transparent", command=self.set_dark_reference)
             self.dark_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
-            self.play_button = CTkButton(self, text="", width=40, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
-            self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
             self.pause_button = CTkButton(self, text="", width=40, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
             self.pause_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+            self.play_button = CTkButton(self, text="", width=40, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
+            self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
             self.save_button = CTkButton(self, text="", width=40, height=40, image=img_save, fg_color="transparent", command=self.save_data)
             self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
             self.save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
@@ -206,10 +206,12 @@ class SpectrometerFrame(CTkFrame):
             self.popup = CTkToplevel(self)
             self.popup.title("Spectrometer - Advanced save")
             self.popup.minsize(405, 330)
-            self.center_popup((600,400))
+            self.center_popup(600, 400)
             self.popup.grid_rowconfigure((1,2,3,4,5,6), weight=1)
             self.popup.grid_columnconfigure((0,1), weight=1)
             self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
+            self.popup.attributes("-topmost", True)
+            self.after(50, lambda: self.popup.attributes("-topmost", False))
 
             time = f"{datetime.now():%Y%m%d_%H.%M.%S}"
             acq = (self.spectrometer.integration_time or 100000) /1000
@@ -288,10 +290,10 @@ class SpectrometerFrame(CTkFrame):
             self.notification(f"Must be a positive integer", color="#8e0101")
 
 
-    def center_popup(self, size):
-        x = int((self.master.winfo_width()/2) + self.master.winfo_x() - (size[0]/2))
-        y = int((self.master.winfo_height()/2) + self.master.winfo_y() - (size[1]/2))
-        self.popup.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
+    def center_popup(self, width, height):
+        x = int((self.master.winfo_width()/2) + self.master.winfo_x() - (width/2))
+        y = int((self.master.winfo_height()/2) + self.master.winfo_y() - (height/2))
+        self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
 
     def close_popup(self):

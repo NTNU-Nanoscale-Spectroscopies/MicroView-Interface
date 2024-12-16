@@ -1,4 +1,4 @@
-class MyPlatform():
+class MyStage():
     def __init__(self, name, serial, enable=False):
         self.name = name
         self.serial = serial

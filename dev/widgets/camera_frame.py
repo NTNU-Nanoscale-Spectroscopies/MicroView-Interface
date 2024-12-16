@@ -31,16 +31,16 @@ class CameraFrame(CTkFrame):
             self.disconnected_button.grid_forget()
 
             self.image_queue = None
-            self.resize_after_id = None
             self.aspect_ratio = None
             self.image_width = None
             self.image_height = None
-            #self.bind("<Configure>", self.on_resize)
 
             self.image_label = CTkLabel(self, text="")
             self.image_label.grid(row=0, column=1, sticky="nsew", rowspan=4)
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=(5,0), sticky="ne")
+            self.resize_button = CTkButton(self, text="", width=40, height=40, image=img_rescale, fg_color="transparent", command=self.resize_image)
+            self.resize_button.grid(row=1, column=2, padx=5, pady=(5,0), sticky="ne")
             self.pause_button = CTkButton(self, text="", width=30, height=40, image=img_pause, fg_color="transparent", command=self.stop_camera)
             self.pause_button.grid(row=0, column=0, padx=5, pady=(5,0), sticky="nw")
             self.play_button = CTkButton(self, text="", width=30, height=40,  image=img_play, fg_color="transparent", command=self.start_camera)
@@ -90,12 +90,6 @@ class CameraFrame(CTkFrame):
             except queue.Empty:
                 pass
             self.after(100, self.update_image)
-
-
-    def on_resize(self, event):
-        if self.resize_after_id:
-            self.after_cancel(self.resize_after_id)
-        self.resize_after_id = self.after(20, self.resize_image)
 
 
     def resize_image(self):

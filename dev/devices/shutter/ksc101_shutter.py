@@ -69,6 +69,7 @@ class KSC101_Shutter():
         return self.state()
 
     def state(self):
+        if not self.connected: return False
         if self.shutter.GetSolenoidState() == "Open":
             self.is_open = True
         elif self.shutter.GetSolenoidState() == "Closed":

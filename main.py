@@ -1,6 +1,6 @@
 from dev.application import *
 
-version = "V1.1.0"
+version = "V1.1.1"
 size = (1200,700)
 visible_notif_time = 3
 backup_directory = "C:/Users/A068/Desktop/Data"
@@ -13,7 +13,7 @@ gm_microscope = MyMicroscope("Maria Goeppert Mayer",
     MyLaser("Laser 750nm", "xxxx", shutter_model="KSC101", shutter_serial="68801094"),
     MyLaser("Laser 550nm", "xxxx", shutter_model="KSC101", shutter_serial="68800970"),
     MyFilter("Filter 12", "xxxx"),
-    MyPlatform("Platform", "xxxx"))
+    MyStage("Stage", "xxxx"))
 
 lm_microscope = MyMicroscope("Lise Meitner",
     MySpectrometer("Spectrometer", "xxxx", enable=True),
@@ -21,7 +21,7 @@ lm_microscope = MyMicroscope("Lise Meitner",
     MyShutter("White light", "xxxx", enable=True, model="KSC101"),
     MyLaser("Laser 750nm", "xxxx", shutter_model="KSC101", shutter_serial="xxxx"),
     MyFilter("Filter 12", "xxxx"),
-    MyPlatform("Platform", "xxxx"))
+    MyStage("Stage", "xxxx"))
 
 
 app = MyApp(version, size, visible_notif_time, backup_directory, gm_microscope, lm_microscope)

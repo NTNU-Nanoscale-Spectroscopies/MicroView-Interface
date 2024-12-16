@@ -1,24 +1,38 @@
 # Changelog
 
+## [1.1.1] - 2024-12-16
+### <span style="color:green"> Added </span>
+- Dev : Added a button to resize the camera
+- Dev : Added a popup to configure specific application variables
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Improved styling management for the `open/close` shutters button
+- Dev : Updated the `start/stop` buttons upon connection
+- Dev : When a popup opens, it is now displayed in the foreground
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Standardized image sizes in the `images` folder (64x64 for icons).
+- Dev : Updated the "backup name" label in the `directory_frame`
+- Dev : Improved the item listing system in the `setup_frame` file
+- Dev : Renamed the `MyPlatform` class to `MyStage`
+
 ## [1.1.0] - 2024-12-05
 ### <span style="color:green"> Added </span>
-- Dev: Added the `__repr__` method to missing device classes
-- Dev: Reorganized shutter functionalities
-- Dev: Automatic opening of shutters at startup and closing at script termination
-- Dev: Simplified configuration in the `main.py` file
-- Dev: Restructured the `setup_frame.py` file for better organization
-- Dev: Linked the `MyShutter` class with the `MyLaser` class
-- Dev: Added required Kinesis DLLs
+- Dev : Added the `__repr__` method to missing device classes
+- Dev : Reorganized shutter functionalities
+- Dev : Automatic opening of shutters at startup and closing at script termination
+- Dev : Simplified configuration in the `main.py` file
+- Dev : Restructured the `setup_frame.py` file for better organization
+- Dev : Linked the `MyShutter` class with the `MyLaser` class
+- Dev : Added required Kinesis DLLs
 ### <span style="color:#d6a600"> Changed </span>
-- Dev: Tools are now connected only after all graphical elements are fully initialized
-- Dev: Improved the build system to generate only the executable without including unnecessary files
+- Dev : Tools are now connected only after all graphical elements are fully initialized
+- Dev : Improved the build system to generate only the executable without including unnecessary files
 ### <span style="color:purple"> Issues </span>
-- Dev: The `enable` parameter allows tools to start as soon as they are connected, but certain graphical elements do not update accordingly
-- Dev: The `open/close` button for shutters does not update automatically when tools are connected or disconnected
-- Dev: If multiple spectrometers are present and the first one is not connected, no attempt is made to connect the others
+- Dev : The `enable` parameter allows tools to start as soon as they are connected, but certain graphical elements do not update accordingly
+- Dev : The `open/close` button for shutters does not update automatically when tools are connected or disconnected
+- Dev : If multiple spectrometers are present and the first one is not connected, no attempt is made to connect the others
 ### <span style="color:#bf2a2a"> Removed </span>
-- Dev: Removed the `whitelight.py` file and its associated class
-- Dev: Removed the `devices.py` file and its associated class
+- Dev : Removed the `whitelight.py` file and its associated class
+- Dev : Removed the `devices.py` file and its associated class
 
 ## [1.0.4] - 2024-12-03
 ### <span style="color:green"> Added </span>

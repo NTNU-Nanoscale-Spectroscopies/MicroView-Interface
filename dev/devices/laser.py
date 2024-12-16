@@ -22,6 +22,15 @@ class MyLaser():
         if self.shutter:
             self.shutter.disconnect()
 
+    def open(self):
+        return self.shutter.open()
+
+    def close(self):
+        return self.shutter.close()
+
+    def state(self):
+        return self.shutter.state()
+
     def __repr__(self):
         if self.shutter:
             return f"{self.name}, serial : {self.serial}\n\t{self.shutter}"

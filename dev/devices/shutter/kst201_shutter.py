@@ -20,6 +20,7 @@ class KST201_Shutter():
         self.enable = enable
         self.connected = False
         self.is_open = False
+        self.shutter = None
 
 
     def connect(self):
