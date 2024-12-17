@@ -3,7 +3,6 @@ from ..images.images import *
 from ..devices.camera.camera import *
 from ..devices.spectrometer import *
 from ..devices.shutter.shutter import *
-from ..devices.laser import *
 from ..devices.filter import *
 from ..devices.stage import *
 
@@ -36,16 +35,6 @@ class QuickSetupFrame(CTkScrollableFrame):
                 widgets.append((button,""))
                 widgets.append((entry,""))
                 widgets.append((label,"NonDisableable"))
-
-            elif isinstance(device, MyLaser):
-                info = CTkButton(frame, text="", corner_radius=50, width=15, image=img_info, fg_color="transparent")
-                info.pack(side="left")
-                widgets.append((info,""))
-                if device.shutter:
-                    button = CTkButton(frame, text="Close", state="disabled", width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
-                    button.configure(command=lambda d=device.shutter, b=button: self.toggle_shutter(d,b))
-                    button.pack(side="left")
-                    widgets.append((button,"Shutter"))
 
             elif isinstance(device, MyFilter):
                 pass

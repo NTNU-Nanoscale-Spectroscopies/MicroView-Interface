@@ -42,7 +42,8 @@ class KSC101_Shutter():
             if self.enable:
                 self.open()
             else:
-                self.state()
+                self.close()
+            self.state()
 
         except Exception as e:
             pass

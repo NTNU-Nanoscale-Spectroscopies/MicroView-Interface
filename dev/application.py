@@ -20,8 +20,7 @@ class MyApp(CTk):
         self.popup = None
         self.swicth_theme_mode()
         self.set_windows_scale()
-        dimension = self.center_window(size[0], size[1])
-        self.geometry(dimension)
+        self.center_window(size[0], size[1])
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
@@ -59,7 +58,13 @@ class MyApp(CTk):
     def center_window(self, width, height):
         x = int((self.winfo_screenwidth()/2) - (width/2))
         y = int((self.winfo_screenheight()/2) - (height/2))
-        return f"{width}x{height}+{x}+{y}"
+        self.geometry(f"{width}x{height}+{x}+{y}")
+
+
+    def center_popup(self, width, height):
+        x = int((self.winfo_width()/2) + self.winfo_x() - (width/2))
+        y = int((self.winfo_height()/2) + self.winfo_y() - (height/2))
+        self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
 
     def go_to_microscope(self, microscope):
@@ -97,8 +102,7 @@ class MyApp(CTk):
             self.popup = CTkToplevel(self)
             self.popup.title("Settings")
             self.popup.minsize(405, 200)
-            dimension = self.center_window(600, 250)
-            self.popup.geometry(dimension)
+            self.center_popup(600, 250)
             self.popup.grid_rowconfigure((1,2), weight=1)
             self.popup.grid_columnconfigure((0,1), weight=1)
             self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.2] - 2024-12-17
+### <span style="color:green"> Added </span>
+- Dev : Added a safety system. If a shutter is not enabled, it will attempt to close automatically to prevent displaying an incorrect state to the user
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Settings popup now opens in the center of the main window, rather than in the center of the screen
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : In order to secure the use of lasers, they will no longer be connected to MicroView. The `MyLaser` class has therefore been deleted.
+
 ## [1.1.1] - 2024-12-16
 ### <span style="color:green"> Added </span>
 - Dev : Added a button to resize the camera
