@@ -11,7 +11,19 @@ import csv
 
 
 class SpectrometerFrame(CTkFrame):
+    """Class for creating a frame to control a spectrometer"""
+
     def __init__(self, master, spectrometer):
+        """Create a frame in the main window.
+        Users can easily control the spectrometer
+
+        Parameters
+        ------------
+        master : `CTk`
+            Main window
+        spectrometer : `MySpectrometer`
+            Object containing all information about a spectrometer
+        """
         super().__init__(master)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(3, weight=1)
@@ -26,6 +38,8 @@ class SpectrometerFrame(CTkFrame):
 
 
     def init(self):
+        """Creating the initial spectrometer display
+        """
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
         self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
@@ -44,6 +58,15 @@ class SpectrometerFrame(CTkFrame):
 
 
     def connect(self):
+        """Try connecting the spectrometer. 
+        If the connection is established, the frame is updated to access the associated functionality.
+        In addition, if the device enable parameter is activated, the device is automatically started
+
+        Retruns
+        ------------
+        connect : `bool`
+            Wether the spectrometer is connected
+        """
         if self.spectrometer.connect():
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
@@ -86,10 +109,14 @@ class SpectrometerFrame(CTkFrame):
 
 
     def reconnection(self):
+        """Try reconnecting the spectrometer via `setup frame` to update the display correctly
+        """
         self.master.quick_setup_frame.reconnection(self.spectrometer)
 
     
     def disconnect(self):
+        """Stops the current thread, disconnects the spectrometer cleanly, then updates the display
+        """
         for widget in self.winfo_children():
             widget.destroy()
         self.init()
@@ -97,17 +124,26 @@ class SpectrometerFrame(CTkFrame):
 
 
     def start_spectrometer(self):
+        """Starts thread for continuous spectrometer data extraction
+        """
         self.spectrometer.start()
         self.pause_button.lift()
         self.update_graph()
 
 
     def stop_spectrometer(self):
+        """Stops continuous extraction of spectrometer data without disconnecting the camera
+        """
         self.spectrometer.stop()
         self.play_button.lift()
 
 
     def toggle_mode(self):
+        """Switches between spectrometer data display modes. 
+        The main mode is raw data display. However, if the ligth reference 
+        and dark reference have been taken, it is possible to switch to reflectance/transmittance mode. 
+        Otherwise, a notification is returned to users.
+        """
         if self.reflectance_mode:
             self.reflectance_mode = False
             self.raw_data_button.lift()
@@ -126,6 +162,9 @@ class SpectrometerFrame(CTkFrame):
 
 
     def update_graph(self):
+        """Updates the graph every 20ms with raw data, 
+        or calculates reflectance/transmittance if this mode is enabled.
+        """
         if self.spectrometer.is_running:
             if not self.spectrometer.chart_queue.empty():
                 self.wavelengths, self.intensities = self.spectrometer.chart_queue.get()
@@ -148,6 +187,28 @@ class SpectrometerFrame(CTkFrame):
 
 
     def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):
+        """Saves the current raw data and reflectance/transmittance data if this mode is enabled.
+
+        Notes
+        ------------
+        The saved file name always includes the iteration number, date, time, and spectrometer acquisition time. 
+        Users can modify the file name in the directory frame. However, in the case of an advanced save, 
+        the name specified in the associated popup takes priority. If no name is provided in the popup, 
+        the one set in the directory frame will be used. If neither field is filled, the default name will be Spectrum
+
+        Parameters
+        ------------
+        file_path : `str`, optional
+            Path to the file save location, None by default
+        wavelengths : `list(float)`, optional
+            List of measured wavelengths, Empty by default
+        intensities : `list(float)`, optional
+            List of raw intensity data measured, Empty by default
+        single_save : `bool`, optional
+            Defines how files are named and whether or not a notification is returned after saving, True by default
+        reference : `bool`, optional
+            If this variable is true, then save the reflectance/transmittance data, False by default
+        """
         wavelengths = wavelengths if wavelengths is not None else self.wavelengths
         intensities = intensities if intensities is not None else self.intensities
         if wavelengths is not None and intensities is not None:
@@ -186,6 +247,10 @@ class SpectrometerFrame(CTkFrame):
     
     
     def advanced_save(self):
+        """Handles the advanced save process for spectrometer data.
+        Waits briefly to ensure the spectrometer is initialized with the correct integration time. 
+        Then, for the number of iterations requested by the user, it waits for new data to arrive and saves it accordingly.
+        """
         time.sleep((self.acquisition_time /1000) + 0.5)
         self.spectrometer.save_queue.queue.clear()
         while self.backups_counts > 0:
@@ -202,6 +267,9 @@ class SpectrometerFrame(CTkFrame):
 
 
     def advanced_save_popup(self):
+        """Displays the advanced save popup.
+        Allows users to configure a data backup sequence
+        """
         if not self.popup:
             self.popup = CTkToplevel(self)
             self.popup.title("Spectrometer - Advanced save")
@@ -279,6 +347,16 @@ class SpectrometerFrame(CTkFrame):
 
 
     def increment_entry(self, operator, entry):
+        """Adjusts the value in a given entry field by incrementing or decrementing it.
+        Returns a notification if the entry value is not a positive integer
+
+        Parameters
+        ------------
+        operator : `str`
+            Increments field value if “+” or decrements if “-”
+        entry : `CTkEntry`
+            User-modifiable field
+        """
         try:
             val = int(entry.get())
             if operator == "+":
@@ -291,18 +369,32 @@ class SpectrometerFrame(CTkFrame):
 
 
     def center_popup(self, width, height):
+        """Centers the popup window in the main window
+
+        Parameters
+        ------------
+        width : `int`
+            Popup width
+        height : `int`
+            Popup height
+        """
         x = int((self.master.winfo_width()/2) + self.master.winfo_x() - (width/2))
         y = int((self.master.winfo_height()/2) + self.master.winfo_y() - (height/2))
         self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
 
     def close_popup(self):
+        """Closes the settings popup cleanly
+        """
         if self.popup:
             self.popup.destroy()
             self.popup = None
     
 
     def is_thread_finished(self):
+        """Checks every 500ms if the advanced save thread is finished. 
+        If so, then the advanced save popup is cleanly closed
+        """
         if self.thread_finish:
             self.spectrometer.acquire_save_data = 0
             self.close_popup()
@@ -311,6 +403,9 @@ class SpectrometerFrame(CTkFrame):
     
 
     def start_save_thread(self):
+        """Checks that all fields entered by the user are correct. 
+        If so, initialize and start the advanced save thread
+        """
         if not self.check_acquisition_time(): return
         if not self.check_backups_counts(): return
         if not self.check_save_frequency(): return
@@ -345,6 +440,16 @@ class SpectrometerFrame(CTkFrame):
 
 
     def check_acquisition_time(self):
+        """Checks the validity of content entered by users before using it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the acquisition time must be a positive float between 8 and 1600000
+        
+        Returns
+        ------------
+        check_acquisition_time : `bool`
+            Whether or not valid
+        """
         try:
             self.acquisition_time = float(self.acquisition_time_entry.get())
             if 8 <= self.acquisition_time <= 1600000:
@@ -358,6 +463,16 @@ class SpectrometerFrame(CTkFrame):
 
 
     def check_backups_counts(self):
+        """Checks the validity of content entered by users before using it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the backups counts must be a positive integer
+        
+        Returns
+        ------------
+        check_backups_counts : `bool`
+            Whether or not valid
+        """
         try:
             self.backups_counts = int(self.backups_counts_entry.get())
             self.backups_counts_memorie = self.backups_counts
@@ -371,6 +486,16 @@ class SpectrometerFrame(CTkFrame):
 
 
     def check_save_frequency(self):
+        """Checks the validity of content entered by users before using it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the save frequency must be a positive integer
+        
+        Returns
+        ------------
+        check_save_frequency : `bool`
+            Whether or not valid
+        """
         try:
             self.save_frequency = int(self.save_frequency_entry.get())
             result = self.save_frequency > 0
@@ -383,6 +508,8 @@ class SpectrometerFrame(CTkFrame):
 
 
     def set_light_reference(self):
+        """Stores light reference data
+        """
         self.light_reference_wavelengths, self.light_reference_intensities = self.wavelengths, self.intensities
         self.light_ref_acquisition_time = self.spectrometer.integration_time
         if self.light_reference_intensities is not None:
@@ -394,6 +521,8 @@ class SpectrometerFrame(CTkFrame):
 
 
     def set_dark_reference(self):
+        """Stores dark reference data
+        """
         self.dark_reference_wavelengths, self.dark_reference_intensities = self.wavelengths, self.intensities
         self.dark_ref_acquisition_time = self.spectrometer.integration_time
         if self.dark_reference_intensities is not None:
@@ -406,6 +535,10 @@ class SpectrometerFrame(CTkFrame):
 
 
     def import_chart(self):
+        """Overloads the graph with data imported by users. 
+        Adjusts axis titles according to the display mode selected. 
+        Displays file names in the legend in a simplified version
+        """
         file_paths = filedialog.askopenfilenames(filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
         self.stop_spectrometer()
         if file_paths:
@@ -454,12 +587,29 @@ class SpectrometerFrame(CTkFrame):
 
 
     def extend(self):
+        """Not available.
+        The purpose of this method is to open the spectrometer frame in a 
+        new window in order to have a larger view of the spectrometer graph
+        """
         self.notification(f"Coming soon !", color="#006bd2")
 
     def notification(self, head_message=None, message=None, color=None,):
+        """Creates notifications attached to the main window. 
+
+        Parameters
+        ------------
+        head_message : `str`, optional
+            Main content. None by default
+        message : `str`, optional
+            Sub-content used to display the path of the last saved file. None by default
+        color : `str`, optional
+            Notification border color. Grey by default
+        """
         self.master.notification(head_message, message, color)
 
     def on_closing(self):
+        """Stops the current thread and disconnects the spectrometer cleanly
+        """
         if self.spectrometer:
             self.backups_counts = 0
             time.sleep(0.2)

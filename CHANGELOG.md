@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.3] - 2024-12-19
+### <span style="color:green"> Added </span>
+- Dev : Added detailed documentation for each method in the program
+- Dev : Added standardization of spaces between each method/class
+
 ## [1.1.2] - 2024-12-17
 ### <span style="color:green"> Added </span>
 - Dev : Added a safety system. If a shutter is not enabled, it will attempt to close automatically to prevent displaying an incorrect state to the user

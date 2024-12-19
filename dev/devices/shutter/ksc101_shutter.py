@@ -14,7 +14,18 @@ except:
 
 
 class KSC101_Shutter():
+    """Class for creating an object that communicates with and controls a KSC101 shutter device"""
+
     def __init__(self, serial, enable=False):
+        """Create a new KSC101 Shutter object for easy communication with the device concerned
+
+        Parameters
+        ------------
+        serial : `str`
+            The unique device serial number enabling communication
+        enable : `bool`, optional
+            Allows or prevents the device from starting once it is connected. False by default
+        """
         self.serial = serial
         self.enable = enable
         self.connected = False
@@ -22,6 +33,13 @@ class KSC101_Shutter():
 
 
     def connect(self):
+        """Try to establish communication with the device
+
+        Retruns
+        ------------
+        connect : `bool`
+            Whether communication is established
+        """
         self.connected = False
         try:
             DeviceManagerCLI.BuildDeviceList()
@@ -49,7 +67,15 @@ class KSC101_Shutter():
             pass
         return self.connected
 
+
     def disconnect(self):
+        """Try to cleanly terminate communication with the device
+
+        Retruns
+        ------------
+        disconnect : `bool`
+            Whether communication is stopped
+        """
         if self.connected:
             self.close()
             self.shutter.StopPolling()
@@ -57,19 +83,43 @@ class KSC101_Shutter():
             self.connected = False
         return self.connected
 
+
     def open(self):
+        """Try to open the shutter
+
+        Retruns
+        ------------
+        open : `bool`
+            Whether the shutter is open
+        """
         if self.connected:
             self.shutter.SetOperatingState(SolenoidStatus.OperatingStates.Active)
             self.is_open = True
         return self.state()
 
+
     def close(self):
+        """Try to close the shutter
+
+        Retruns
+        ------------
+        close : `bool`
+            Whether the shutter is close
+        """
         if self.connected:
             self.shutter.SetOperatingState(SolenoidStatus.OperatingStates.Inactive)
             self.is_open = False
         return self.state()
 
+
     def state(self):
+        """Returns the shutter state
+
+        Retruns
+        ------------
+        state : `bool`
+            Whether the shutter is open
+        """
         if not self.connected: return False
         if self.shutter.GetSolenoidState() == "Open":
             self.is_open = True

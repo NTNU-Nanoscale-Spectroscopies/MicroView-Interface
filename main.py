@@ -1,10 +1,84 @@
+###############################################################################
+#                                                                             #
+#                             MicroView - interface                           #
+#                                                                             #
+###############################################################################
+#                                                                             #
+# Description:                                                                #
+# This project aims to centralize microscope devices and functionalities      #
+# within a single software platform. The aim is to simplify their management, #
+# while improving the efficiency and productivity of research activities.     #
+#                                                                             #
+# Supervised by :                                                             #
+# - Angelos XOMALIS                                                           #
+# - Julia LÖVGREN                                                             #
+#                                                                             #
+# Developpers :                                                               #
+# - Noah JACOB                                                                #
+#                                                                             #
+###############################################################################
+
+# -------------------------------------------------------------------------
+# How to create a microscope:
+#
+# 1. Use the `MyMicroscope` class, providing:
+#    - A name for the microscope (str).
+#    - A list of components: `MyCamera`, `MySpectrometer`, `MyShutter`, 
+#      `MyFilter` or `MyStage`.
+#
+# 2. Each component has its own constructor and specific parameters, for example:
+#    - `MyCamera(name, serial, enable)`
+#    - `MySpectrometer(name, serial, enable, dark_correction, integration_time)`
+#    - `MyShutter(name, serial, enable, model)`
+#    - `MyFilter(name, serial, enable)`
+#    - `MyStage(name, serial, enable)`
+#
+# Parameter definition :
+#    - `name` (str): The name of the device.
+#    - `serial` (str): The unique serial number for the device.
+#    - `enable` (bool): Whether the device is activated after connection (True/False).
+#    - `dark_correction` (bool): Whether to apply dark correction (True/False).
+#    - `integration_time` (int): Default integration time in milliseconds.
+#    - `model` (str): The model name of the shutter.
+#
+# 3. Combine all components into a single `MyMicroscope` instance.
+# If a parameter is not added, then its default value is None or False.
+#
+# Example:
+# new_microscope = MyMicroscope(
+#     "My new microscope",
+#     MyCamera("Camera", "12345", enable=True),
+#     MySpectrometer("Spectrometer", "67890", enable=True, integration_time=100),
+#     MyShutter("Shutter 1", "09876", enable=False, model="KSC101")
+#     MyShutter("Shutter 2", "54321", model="KST201")
+# )
+#
+# 4. After defining microscopes, they can be passed into `MyApp` to initialize 
+# the main application and start its interface.
+#
+# Example:
+# app = MyApp(version, size, visible_notif_time, backup_directory, new_microscope)
+# app.mainloop()
+# -------------------------------------------------------------------------
+
+
+
+# Import necessary components from the application's module
 from dev.application import *
 
-version = "V1.1.2"
+# Define the application version
+version = "V1.1.3"
+
+# Set the size of the application's main window (width, height)
 size = (1200,700)
+
+# Set the duration for which notifications will remain visible (in seconds)
 visible_notif_time = 3
+
+# Specify the directory where data backups will be saved
 backup_directory = "C:/Users/A068/Desktop/Data"
 
+# Create an instance of a microscope setup
 gm_microscope = MyMicroscope("Maria Goeppert Mayer",
     MyCamera("Camera", "28939", enable=True),
     MySpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
@@ -15,6 +89,7 @@ gm_microscope = MyMicroscope("Maria Goeppert Mayer",
     MyFilter("Filter 12", "xxxx"),
     MyStage("Stage", "xxxx"))
 
+# Create an instance of a microscope setup
 lm_microscope = MyMicroscope("Lise Meitner",
     MySpectrometer("Spectrometer", "xxxx", enable=True),
     MyCamera("Camera", "xxxx", enable=True),
@@ -24,5 +99,8 @@ lm_microscope = MyMicroscope("Lise Meitner",
     MyStage("Stage", "xxxx"))
 
 
+# Create the main application instance
 app = MyApp(version, size, visible_notif_time, backup_directory, gm_microscope, lm_microscope)
+
+# Start the application loop
 app.mainloop()

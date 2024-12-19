@@ -8,7 +8,24 @@ import ctypes
 
 
 class MyApp(CTk):
+    """MicroView's main class creates the entire application"""
+
     def __init__(self, version, size, visible_notif_time, backup_directory, *microscopes):
+        """Create the MicroView's main window
+
+        Parameters
+        ------------
+        version : `str`
+            Defines current version
+        size : `tuple(width, height)`
+            Sets window dimensions at startup
+        visible_notif_time : `int`
+            Sets the visible time of notifications, in seconds
+        backup_directory : `str`
+            Sets the root directory where backups will be made
+        microscopes : `MyMicroscope`
+            Is a variadic parameter that contains all the information related to a microscope
+        """
         super().__init__()
         self.version = version
         self.microscopes = list(microscopes)
@@ -25,7 +42,10 @@ class MyApp(CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
 
+
     def menu(self):
+        """Displays the application's main menu
+        """
         self.selected_microscope = None
         for widget in self.winfo_children():
             widget.destroy()
@@ -51,23 +71,51 @@ class MyApp(CTk):
 
 
     def swicth_theme_mode(self):
+        """Toggles the application's graphics mode, 
+        from day mode to night mode and vice-versa
+        """
         self.apparence_color_theme = "light" if self.apparence_color_theme == "dark" else "dark"
         set_appearance_mode(self.apparence_color_theme)
 
 
     def center_window(self, width, height):
+        """Centers the main window in the screen
+
+        Parameters
+        ------------
+        width : `int`
+            Window width
+        height : `int`
+            Window height
+        """
         x = int((self.winfo_screenwidth()/2) - (width/2))
         y = int((self.winfo_screenheight()/2) - (height/2))
         self.geometry(f"{width}x{height}+{x}+{y}")
 
 
     def center_popup(self, width, height):
+        """Centers the popup window in the main window
+
+        Parameters
+        ------------
+        width : `int`
+            Popup width
+        height : `int`
+            Popup height
+        """
         x = int((self.winfo_width()/2) + self.winfo_x() - (width/2))
         y = int((self.winfo_height()/2) + self.winfo_y() - (height/2))
         self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
 
     def go_to_microscope(self, microscope):
+        """Displays the microscope config panel
+
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains all information about the selected microscope
+        """
         self.selected_microscope = microscope
         for widget in self.winfo_children():
             widget.destroy()
@@ -98,6 +146,9 @@ class MyApp(CTk):
 
 
     def settings_popup(self):
+        """Displays the setings popup.
+        Allows users to modify certain application parameters
+        """
         if not self.popup:
             self.popup = CTkToplevel(self)
             self.popup.title("Settings")
@@ -132,12 +183,16 @@ class MyApp(CTk):
 
 
     def close_popup(self):
+        """Closes the settings popup cleanly
+        """
         if self.popup:
             self.popup.destroy()
             self.popup = None
 
 
     def save_settings(self):
+        """Saves changes made in the settings popup
+        """
         try:
             if float(self.visible_notif_time_entry.get()) <= 0:
                 self.notification(f"Visible notification time must be positive", color="#8e0101")
@@ -152,19 +207,50 @@ class MyApp(CTk):
         
 
     def find_device_by_type(self, microscope, device_type):
+        """Returns elements of the requested type according to the microscope selected
+
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains the selected microscope for which we are looking for elements
+        device_type, `class`
+            Contains the class to be checked
+
+        Returns
+        ------------
+        find_device_by_type : `list(class)`
+            Returns the list of objects corresponding to the requested class
+        """
         for device in microscope.devices:
             if isinstance(device, device_type):
                 return device
         return None
 
+
     def stop_devices(self):
+        """Stops and disconnects all devices currently in use, 
+        then returns to the main menu
+        """
         if not self.selected_microscope: return
         for device in self.selected_microscope.devices:
             device.disconnect()
         self.notif_list = []
         self.menu()
 
+
     def notification(self, head_message=None, message=None, color=None):
+        """Creates notifications attached to the main window. 
+        Also supports visual stacking of notifications
+
+        Parameters
+        ------------
+        head_message : `str`, optional
+            Main content. None by default
+        message : `str`, optional
+            Sub-content used to display the path of the last saved file. None by default
+        color : `str`, optional
+            Notification border color. Grey by default
+        """
         notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time)
         self.notif_list.insert(0, notification)
         shift = notification.height * self.scale + 8
@@ -172,10 +258,11 @@ class MyApp(CTk):
             notif.draw(shift)
             shift += notif.winfo_height() + 10
 
-    def __repr__(self):
-        return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
 
     def set_windows_scale(self):
+        """Determines the zoom value of the window screen. 
+        The aim is to maintain consistency with the size and position of the elements
+        """
         self.scale = 1
         if sys.platform.startswith("win"):
             user32 = ctypes.windll.user32
@@ -184,11 +271,18 @@ class MyApp(CTk):
             user32.ReleaseDC(0, hdc)
             self.scale = dpi / 96
 
+
     def on_closing(self):
+        """This method is called when the application is closed, 
+        and its purpose is to hide the application until it closes cleanly
+        """
         self.withdraw()
         self.after(300, self.close)
 
+
     def close(self):
+        """This method allows threads to be stopped cleanly before devices are disconnected
+        """
         if not self.is_menu:
             self.spectrometer_frame.on_closing()
             self.camera_frame.on_closing()
@@ -196,10 +290,27 @@ class MyApp(CTk):
         self.destroy()
 
 
+    def __repr__(self):
+        return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
+
+
+
 class MyMicroscope:
+    """Class for creating microscopes"""
+
     def __init__(self, name, *devices):
+        """Create a new microscope, with its own devices
+
+        Parameters
+        ------------
+        name : `str`
+            Micrsoscope name
+        devices : `class`
+            Is a variadic parameter that contains all the information related to a device
+        """
         self.name = name
         self.devices = list(devices)
+
 
     def __repr__(self):
         return f"Devices in the {self.name} microscope :\n\t" + "\n\t".join([f"{device}" for device in self.devices]) + "\n"

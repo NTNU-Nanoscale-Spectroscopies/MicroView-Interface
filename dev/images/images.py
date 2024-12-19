@@ -5,6 +5,9 @@ import sys
 
 
 def set_working_directory():
+    """Adjusts the project's working directory to ensure it uses the correct base path,
+    especially when compiled into an executable
+    """
     try:
         base_path = sys._MEIPASS
         os.chdir(base_path)
@@ -15,6 +18,24 @@ set_working_directory()
 
 
 def load_image(size, light_filename, dark_filename=None, path="dev/images/"):
+    """Loads the requested image, then returns a CustomTkinter image
+
+    Parameters
+    ------------
+    size : `tuple(width, height)`
+        Image size
+    light_filename : `str`
+        Image name in light mode
+    dark_filename : `str`, optional
+        Image name in dark mode, by default None
+    path : `str`, optional
+        Path to image folder, by default `dev/images/`
+
+    Returns
+    ---------
+    load_image : `CTkImage`
+        returns a CustomTkinter image
+    """
     try:
         light_image_data = Image.open(f"{path}light-mode/{light_filename}")
     except (FileNotFoundError, UnidentifiedImageError) as e:

@@ -2,7 +2,19 @@ from ..images.images import *
 
 
 class MicroscopeFrame(CTkFrame):
+    """Class for creating a frame with a button for each microscope"""
+
     def __init__(self, master, microscopes):
+        """Create a frame in the main window with a button for each microscope.
+        Users can choose wich microscope to use
+
+        Parameters
+        ------------
+        master : `CTk`
+            Main window
+        microscopes : `list(MyMicroscope)`
+            List of all microscopes with all components/devices
+        """
         super().__init__(master, fg_color="transparent")
         self.grid_rowconfigure(0, weight=1)
         self.microscopes = microscopes

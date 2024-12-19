@@ -4,7 +4,19 @@ import queue
 
 
 class CameraFrame(CTkFrame):
+    """Class for creating a frame to control a camera"""
+
     def __init__(self, master, camera):
+        """Create a frame in the main window.
+        Users can easily control the camera
+
+        Parameters
+        ------------
+        master : `CTk`
+            Main window
+        camera : `MyCamera`
+            Object containing all information about a camera
+        """
         super().__init__(master)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(3, weight=1)
@@ -19,6 +31,8 @@ class CameraFrame(CTkFrame):
 
 
     def init(self):
+        """Creating the initial camera display
+        """
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
         self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
         self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
@@ -26,6 +40,15 @@ class CameraFrame(CTkFrame):
 
 
     def connect(self):
+        """Try connecting the camera. 
+        If the connection is established, the frame is updated to access the associated functionality.
+        In addition, if the device enable parameter is activated, the device is automatically started
+        
+        Retruns
+        ------------
+        connect : `bool`
+            Wether the camera is connected
+        """
         if self.camera.connect():
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
@@ -56,10 +79,14 @@ class CameraFrame(CTkFrame):
 
 
     def reconnection(self):
+        """Try reconnecting the camera via `setup frame` to update the display correctly
+        """
         self.master.quick_setup_frame.reconnection(self.camera)
 
 
     def disconnect(self):
+        """Stops the current thread, disconnects the camera cleanly, then updates the display
+        """
         for widget in self.winfo_children():
             widget.destroy()
         self.init()
@@ -67,17 +94,24 @@ class CameraFrame(CTkFrame):
 
 
     def start_camera(self):
+        """Starts thread for continuous camera image extraction
+        """
         self.image_queue = self.camera.run()
         self.pause_button.lift()
         self.update_image()
 
 
     def stop_camera(self):
+        """Stops continuous extraction of camera images without disconnecting the camera
+        """
         self.camera.stop()
         self.play_button.lift()
 
 
     def update_image(self):
+        """Updates display with images retrieved by camera every 100ms.
+        Initializes the image dimensions obtained in the first iteration
+        """
         if self.image_queue and self.camera.is_running:
             try:
                 self.current_image = self.image_queue.get_nowait()
@@ -93,6 +127,8 @@ class CameraFrame(CTkFrame):
 
 
     def resize_image(self):
+        """Updates image dimensions according to available window space
+        """
         if self.aspect_ratio:
             frame_width = int(self.master.winfo_width() /2.6)
             frame_height = int(self.master.winfo_height() /2.6)
@@ -106,6 +142,8 @@ class CameraFrame(CTkFrame):
 
 
     def save_image(self):
+        """Saves the current image with the name assigned in the `directory frame`
+        """
         if self.current_image:
             file_path = self.master.directory_frame.get_camera_directory()
             if file_path:
@@ -123,9 +161,15 @@ class CameraFrame(CTkFrame):
 
 
     def extend(self):
+        """Not available.
+        The purpose of this method is to open the camera frame in a 
+        new window in order to have a larger view of the camera return
+        """
         self.master.notification(f"Coming soon !", color="#006bd2")
 
 
     def on_closing(self):
+        """Stops the current thread and disconnects the camera cleanly
+        """
         if self.camera:
             self.camera.disconnect()

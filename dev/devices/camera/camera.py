@@ -8,8 +8,22 @@ import threading
 import queue
 configure_path()
 
+
 class MyCamera():
+    """Class for creating an object that communicates with and controls a camera-type device"""
+
     def __init__(self, name, serial, enable=False):
+        """Create a new Camera object for easy communication with the device concerned
+
+        Parameters
+        ------------
+        name : `str`
+            Visible name of this device in the graphical interface
+        serial : `str`
+            The unique device serial number enabling communication
+        enable : `bool`, optional
+            Allows or prevents the device from starting once it is connected. False by default
+        """
         self.name = name
         self.serial = serial
         self.enable = enable
@@ -17,7 +31,15 @@ class MyCamera():
         self.is_running = False
         self.image_acquisition_thread = None
 
+
     def connect(self):
+        """Try to establish communication with the device
+
+        Retruns
+        ------------
+        connect : `bool`
+            Whether communication is established
+        """
         self.connected = False
         self.is_running = False
         try:
@@ -35,20 +57,33 @@ class MyCamera():
     
 
     def run(self):
+        """Starts camera data acquisition thread
+
+        Retruns
+        ------------
+        run : `bool`
+            Whether the thread is started
+        """
         if self.connected and not self.is_running and not self.image_acquisition_thread:
             self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
             self.image_acquisition_thread.start()
             self.is_running = True
         return self.image_acquisition_thread.get_output_queue()
 
+
     def stop(self):
+        """Stops spectrometer data acquisition thread
+        """
         if self.connected and self.is_running and self.image_acquisition_thread:
             self.image_acquisition_thread.stop()
             self.image_acquisition_thread.join()
             self.image_acquisition_thread = None
             self.is_running = False
 
+
     def disconnect(self):
+        """Try to cleanly terminate communication with the device
+        """
         if self.connected:
             self.stop()
             self.camera.disarm()
@@ -56,13 +91,23 @@ class MyCamera():
             self.sdk.dispose()
             self.connected = False
 
+
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
 
 
+
 class ImageAcquisitionThread(threading.Thread):
+    """Class for creating a camera data acquisition thread"""
 
     def __init__(self, camera):
+        """Create a new thread to acquire and process camera data
+
+        Parameters
+        ------------
+        camera : `MyCamera`
+            Object containing all information about a camera
+        """
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
         self._previous_timestamp = 0
@@ -90,13 +135,37 @@ class ImageAcquisitionThread(threading.Thread):
         self._image_queue = queue.Queue(maxsize=2)
         self._stop_event = threading.Event()
 
+
     def get_output_queue(self):
+        """Returns the last image obtained by the camera
+
+        Returns
+        ------------
+        get_output_queue : `PIL.Image`
+            Returns PIL.Image object obtained by the camera
+        """
         return self._image_queue
 
+
     def stop(self):
+        """Stops cleanly the data acquisition thread
+        """
         self._stop_event.set()
 
+
     def _get_color_image(self, frame):
+        """Converts a monochrome image buffer to a color image
+
+        Parameters
+        ------------
+        frame : `Frame`
+            The frame containing the monochrome image buffer to be converted
+
+        Returns
+        ------------
+        _get_color_image : `PIL.Image`
+            Returns a PIL.Image object in RGB mode representing the converted color image
+        """
         width = frame.image_buffer.shape[1]
         height = frame.image_buffer.shape[0]
         if (width != self._image_width) or (height != self._image_height):
@@ -106,11 +175,31 @@ class ImageAcquisitionThread(threading.Thread):
         color_image_data = color_image_data.reshape(self._image_height, self._image_width, 3)
         return Image.fromarray(color_image_data, mode='RGB')
 
+
     def _get_image(self, frame):
+        """Converts a raw image buffer to an 8-bit grayscale image.
+
+        Parameters
+        ------------
+        frame : `Frame`
+            The frame containing the raw image buffer to be scaled and converted.
+
+        Returns
+        ------------
+        _get_image : `PIL.Image`
+            Returns a PIL.Image object in grayscale mode representing the scaled image.
+        """
         scaled_image = frame.image_buffer >> (self._bit_depth - 8)
         return Image.fromarray(scaled_image)
 
+
     def run(self):
+        """Starts the image acquisition loop for the camera.
+
+        This method continuously retrieves frames from the camera, processes them into either color 
+        or grayscale images, and stores them in the image queue. The loop runs until a stop event 
+        is triggered or an error occurs
+        """
         while not self._stop_event.is_set():
             try:
                 frame = self._camera.get_pending_frame_or_null()
