@@ -1,5 +1,80 @@
 # Changelog
 
+## [1.1.4] - 2024-12-20
+### <span style="color:green"> Added </span>
+- Dev : Add files and explanations required for Git LFS to work properly. In order to be able to push large files, in particular  the release executable.
+
+## [1.1.3] - 2024-12-19
+### <span style="color:green"> Added </span>
+- Dev : Added detailed documentation for each method in the program
+- Dev : Added standardization of spaces between each method/class
+
+## [1.1.2] - 2024-12-17
+### <span style="color:green"> Added </span>
+- Dev : Added a safety system. If a shutter is not enabled, it will attempt to close automatically to prevent displaying an incorrect state to the user
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Settings popup now opens in the center of the main window, rather than in the center of the screen
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : In order to secure the use of lasers, they will no longer be connected to MicroView. The `MyLaser` class has therefore been deleted.
+
+## [1.1.1] - 2024-12-16
+### <span style="color:green"> Added </span>
+- Dev : Added a button to resize the camera
+- Dev : Added a popup to configure specific application variables
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Improved styling management for the `open/close` shutters button
+- Dev : Updated the `start/stop` buttons upon connection
+- Dev : When a popup opens, it is now displayed in the foreground
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Standardized image sizes in the `images` folder (64x64 for icons).
+- Dev : Updated the "backup name" label in the `directory_frame`
+- Dev : Improved the item listing system in the `setup_frame` file
+- Dev : Renamed the `MyPlatform` class to `MyStage`
+
+## [1.1.0] - 2024-12-05
+### <span style="color:green"> Added </span>
+- Dev : Added the `__repr__` method to missing device classes
+- Dev : Reorganized shutter functionalities
+- Dev : Automatic opening of shutters at startup and closing at script termination
+- Dev : Simplified configuration in the `main.py` file
+- Dev : Restructured the `setup_frame.py` file for better organization
+- Dev : Linked the `MyShutter` class with the `MyLaser` class
+- Dev : Added required Kinesis DLLs
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Tools are now connected only after all graphical elements are fully initialized
+- Dev : Improved the build system to generate only the executable without including unnecessary files
+### <span style="color:purple"> Issues </span>
+- Dev : The `enable` parameter allows tools to start as soon as they are connected, but certain graphical elements do not update accordingly
+- Dev : The `open/close` button for shutters does not update automatically when tools are connected or disconnected
+- Dev : If multiple spectrometers are present and the first one is not connected, no attempt is made to connect the others
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : Removed the `whitelight.py` file and its associated class
+- Dev : Removed the `devices.py` file and its associated class
+
+## [1.0.4] - 2024-12-03
+### <span style="color:green"> Added </span>
+- Dev : Adds a connection to the shutter device
+- Dev : White light shutter control now possible
+
+## [1.0.3] - 2024-11-29
+### <span style="color:green"> Added </span>
+- Dev : It is now possible to display reflectance or transmittance
+- Dev : It is now possible to save reflectance or transmittance data
+
+## [1.0.2] - 2024-11-29
+### <span style="color:green"> Added </span>
+- Dev : Adds the ability to save light and dark references
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : Remove white calibration button from the camera
+- Dev : Remove software close notification
+
+## [1.0.1] - 2024-11-28
+### <span style="color:green"> Added </span>
+- Dev : It is now possible to change spectrometer during runtime
+- Dev : Added a variable to adjust black correction based on the spectrometer used
+- Dev : Updating switches based on the connection status of the devices
+- Dev : When closing, the software transitions to hidden mode and continues running in the background until fully closed
+
 ## [0.3.4] - 2024-11-27
 ### <span style="color:green"> Added </span>
 - Dev : You can now easily create an executable with the :

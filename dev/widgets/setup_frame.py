@@ -2,93 +2,176 @@ from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
 from ..devices.spectrometer import *
-from ..devices.whitelight import *
-from ..devices.laser import *
+from ..devices.shutter.shutter import *
 from ..devices.filter import *
-from ..devices.platform import *
+from ..devices.stage import *
+
 
 class QuickSetupFrame(CTkScrollableFrame):
+    """Class for creating a frame to control all devices"""
+
     def __init__(self, master, microscope):
+        """Create a frame in the main window.
+        Users can easily control all devices from this panel
+
+        Notes
+        ------------
+        In the setup frame, a space is created for each device associated with the microscope to enable control.
+        Each device is equipped with a switch button to connect or disconnect it, 
+        along with specific elements tailored to the device type. 
+        Some devices can also be controlled from another, more specific frame
+
+        Each widget can be associated with a keyword, allowing it to be treated differently
+
+        Parameters
+        ------------
+        master : `CTk`
+            Main window
+        microscope : `MyMicroscope`
+            Object containing all the information related to a microscope
+        """
         super().__init__(master)
+        self.device_entries = []
+        for i, device in enumerate(microscope.devices):
 
-        self.switch_list = []
-        for i, device in enumerate(microscope.devices.values()):
-
+            widgets = []
+            master_frame = None
             frame = CTkFrame(self)
             frame.grid(row=i, column=0, sticky="nsew")
             switch = CTkSwitch(frame, text=device.name, font=("Arial", 20))
             switch.pack(side="left", padx=(30,10), pady=20)
 
-            state = "disabled"
-            widget_to_disable = []
-            if device.enable and device.connected:
-                switch.select()
-                state = "normal"
-
-            if isinstance(device, MyCamera): 
-                button = CTkButton(frame, text="Calibrate", state=state)
-                button.pack(side="left", padx=10, pady=5)
-                widget_to_disable.append(button)
+            if isinstance(device, MyCamera):
+                master_frame = self.master.master.master.camera_frame
                 
-            elif isinstance(device, MySpectrometer): 
-                entry = CTkEntry(frame, width=100, placeholder_text="100.0")
-                button = CTkButton(frame, text="Set", width=30, state=state, command=lambda d=device, e=entry: self.check_valide_entry(d,e))
+            elif isinstance(device, MySpectrometer):
+                master_frame = self.master.master.master.spectrometer_frame
+                entry = CTkEntry(frame, width=100, placeholder_text=device.integration_time/1000)
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valide_entry(d,e))
                 label = CTkLabel(frame, text="ms")
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
                 label.pack(side="left", padx=3)
-                entry.configure(state=state)
-                widget_to_disable.append(button)
-                widget_to_disable.append(entry)
+                entry.configure(state="disabled")
+                widgets.append((button,""))
+                widgets.append((entry,""))
+                widgets.append((label,"NonDisableable"))
 
-            elif isinstance(device, MyLaser): 
-                button = CTkButton(frame, text="", corner_radius=50, width=15, image=img_info, fg_color="transparent")
+            elif isinstance(device, MyFilter):
+                pass
+
+            elif isinstance(device, MyStage):
+                pass
+
+            elif isinstance(device, MyShutter):
+                button = CTkButton(frame, text="Close", state="disabled", width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
+                button.configure(command=lambda d=device, b=button: self.toggle_shutter(d,b))
                 button.pack(side="left")
+                widgets.append((button,"Shutter"))
 
-            elif isinstance(device, MyFilter): 
-                pass
-
-            elif isinstance(device, MyPlatform): 
-                pass
-
-            self.switch_list.append((switch, device, widget_to_disable))
-            switch.configure(command=lambda d=device, s=switch, w=widget_to_disable: self.toggle_device(d,s,w))
+            self.device_entries.append(DeviceEntry(switch, device, widgets, master_frame))
+            switch.configure(command=lambda e=self.device_entries[-1]: self.toggle_device(e))
 
         self.update_idletasks()
         self.required_height_for_scrollbar = (i+1) * frame.winfo_height()
         self.previous_frame_height = self.master.winfo_height()
         self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
+        self.after(200, self.init)
+
+
+    def init(self):
+        """Essaye de connecter tout les élements du microscope
+
+        In the case of spectrometers, if a spectrometer is already connected,
+        we move on to the next piece of equipment to avoid display problems
+        """
+        spectrometer_already_open = False
+        for entry in self.device_entries:
+            if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
+            element = entry.frame or entry.device
+            if not element.connect():
+                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+            elif isinstance(entry.device, MySpectrometer):
+                spectrometer_already_open = True
+        self.check_connected_devices()
 
 
     def check_connected_devices(self):
-        for switch, device, widgets in self.switch_list:
-            if device.connected:
-                switch.select()
-                for widget in widgets:
-                    widget.configure(state="normal")
-            else:
-                switch.deselect()
+        """For each device, update the element's graphic content to match its actual state
+        """
+        for entry in self.device_entries:
+            entry.activate() if entry.is_device_connected() else entry.desactivate()
 
 
-    def toggle_device(self, device, switch, widget_to_disable):
-        swicth_selected = switch.get()
-        state = "normal" if swicth_selected else "disabled"
-        for widget in widget_to_disable:
-            widget.configure(state=state)
+    def toggle_device(self, entry):
+        """Toggles device connection status (connect/disconnect)
 
-        frame = device
-        if isinstance(device, MyCamera):
-            frame = self.master.master.master.camera_frame
-        elif isinstance(device, MySpectrometer):
-            frame = self.master.master.master.spectrometer_frame
+        To ensure that the spectrometer is correctly displayed in the `spectrometer frame`,
+        before connecting a new spectrometer, the previous one is disconnected to ensure uniform display
 
-        if swicth_selected:
-            frame.connect()
+        If a device's connection attempt fails, a notification is sent back to users
+
+        Parameters
+        ------------
+        entry : `DeviceEntry`
+            Contains all graphic elements associated with a device
+        """
+        element = entry.frame or entry.device
+        if isinstance(entry.device, MySpectrometer):
+            if element.spectrometer != entry.device:
+                element.disconnect()
+                element.spectrometer = entry.device
+
+        if entry.switch.get():
+            if not element.connect():
+                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
         else:
-            frame.disconnect()
+            element.disconnect()
+        self.check_connected_devices()
+
+
+    def reconnection(self, frame_device):
+        """Try reconnecting and updating the graphics elements of the device associated with the frame
+
+        Parameters
+        ------------
+        frame_device : `CTk`
+            Corresponds to a device control frame
+        """
+        for entry in self.device_entries:
+            if entry.device == frame_device:
+                entry.switch.select()
+                self.toggle_device(entry)
+                break
+
+
+    def toggle_shutter(self, device, button):
+        """Toggles state of associated shutter (open/closed)
+
+        Parameters
+        ------------
+        device : `MyShutter`
+            Object containing all the information related to a shutter
+        button : `CTkButton`
+            Graphic element associated with the shutter
+        """
+        device.close() if device.state() else device.open()
+        update_shutter_button_style(button, device)
 
 
     def check_valide_entry(self, device, entry):
+        """Checks the validity of content entered by users before saving it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the input value must be a positive float between 8 and 1600000
+        
+        Parameters
+        ------------
+        device : `MySpectrometer`
+            Object containing all the information related to a spectrometer
+        entry : `CTkEntry`
+            Graphic elements associated with the spectrometer
+        """
         try:
             value = float(entry.get())
             if 8 <= value <= 1600000:
@@ -101,6 +184,9 @@ class QuickSetupFrame(CTkScrollableFrame):
 
 
     def update_scrollbar_visibility(self):
+        """This method allows to hide/show the scrollbar according to the space available in the `setup frame`.
+        To do this, the height of the frame is compared with the number of elements it contains
+        """
         current_height = self.master.winfo_height()
         if current_height != self.previous_frame_height:
             self.previous_frame_height = current_height
@@ -111,4 +197,109 @@ class QuickSetupFrame(CTkScrollableFrame):
 
 
     def notification(self, head_message=None, color=None, message=None):
+        """Creates notifications attached to the main window. 
+
+        Parameters
+        ------------
+        head_message : `str`, optional
+            Main content. None by default
+        color : `str`, optional
+            Notification border color. Grey by default
+        message : `str`, optional
+            Sub-content used to display the path of the last saved file. None by default
+        """
         self.master.master.master.notification(head_message, message, color)
+
+
+
+class DeviceEntry:
+    """Class to simplify connection between devices and graphic frame elements"""
+
+    def __init__(self, switch, device, widgets=[], frame=None):
+        """Create object to simplify connection between devices and graphic frame elements
+
+        Notes
+        ------------
+        In the setup frame, a space is created for each device associated with the microscope to enable control.
+        Each device is equipped with a switch button to connect or disconnect it, 
+        along with specific elements tailored to the device type. 
+        Some devices can also be controlled from another, more specific frame
+
+        Each widget can be associated with a keyword, allowing it to be treated differently
+
+        Parameters
+        ------------
+        switch : `CTkSwitch`
+            Contains the swicth associated with a device
+        device : `class`
+            Object containing all the information related to a device
+        widgets : `list(CTk class)`, optional
+            List of additional objects specific to a device type, Empty by default
+        frame : `CTK`, optional
+            Corresponds to a device control frame
+        """
+        self.switch = switch
+        self.device = device
+        self.widgets = widgets
+        self.frame = frame
+
+
+    def activate(self):
+        """For a device, update the graphical content of the element to match the activation state
+        """
+        self.switch.select()
+        self.update_widgets_state("normal")
+
+
+    def desactivate(self):
+        """For a device, update the graphical content of the element to match the desactivation state
+        """
+        self.switch.deselect()
+        self.update_widgets_state("disabled")
+
+
+    def update_widgets_state(self, state):
+        """For all elements associated with a switch, update the graphical content with the requested state
+
+        Notes
+        ------------
+        Each widget can be associated with a keyword, allowing it to be treated differently
+
+        Parameters
+        ------------
+        state : `str`
+            Corresponds to the graphic state you wish to apply to an element (normal/disabled)
+        """
+        for widget, type in self.widgets:
+            if type != "NonDisableable":
+                widget.configure(state=state)
+            if type == "Shutter":
+                update_shutter_button_style(widget, self.device)
+
+
+    def is_device_connected(self):
+        """Provides device connection status
+
+        Returns
+        ---------
+        is_device_connected : `bool`
+            Provides device connection status (True/False)
+        """
+        return self.device.connected
+
+
+
+def update_shutter_button_style(widget, device):
+    """Updates the graphic content of the shutter open/close button according to the actual state of the device
+
+    Parameters
+    ------------
+    widget : `CTkButton`
+        Graphic element associated with the shutter
+    device : `MyShutter`
+        Object containing all the information related to a shutter
+    """
+    if device.state():
+        widget.configure(text="Open", border_color="#009200", hover_color="#004b00")
+    else:
+        widget.configure(text="Close", border_color="#920000", hover_color="#4b0000")

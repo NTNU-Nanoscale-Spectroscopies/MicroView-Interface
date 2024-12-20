@@ -5,6 +5,9 @@ import sys
 
 
 def set_working_directory():
+    """Adjusts the project's working directory to ensure it uses the correct base path,
+    especially when compiled into an executable
+    """
     try:
         base_path = sys._MEIPASS
         os.chdir(base_path)
@@ -15,6 +18,24 @@ set_working_directory()
 
 
 def load_image(size, light_filename, dark_filename=None, path="dev/images/"):
+    """Loads the requested image, then returns a CustomTkinter image
+
+    Parameters
+    ------------
+    size : `tuple(width, height)`
+        Image size
+    light_filename : `str`
+        Image name in light mode
+    dark_filename : `str`, optional
+        Image name in dark mode, by default None
+    path : `str`, optional
+        Path to image folder, by default `dev/images/`
+
+    Returns
+    ---------
+    load_image : `CTkImage`
+        returns a CustomTkinter image
+    """
     try:
         light_image_data = Image.open(f"{path}light-mode/{light_filename}")
     except (FileNotFoundError, UnidentifiedImageError) as e:
@@ -41,3 +62,6 @@ img_full_screen = load_image((20, 20), 'full_screen_icon_black.png', 'full_scree
 img_retry = load_image((25, 25), 'retry_icon_grey.png')
 img_info = load_image((15, 15), 'info_icon_black.png', 'info_icon_white.png')
 img_plus = load_image((15, 15), 'plus_icon_black.png', 'plus_icon_white.png')
+img_bulb_on = load_image((25, 25), 'bulb_on_icon_black.png', 'bulb_on_icon_white.png')
+img_bulb_off = load_image((25, 25), 'bulb_off_icon_black.png', 'bulb_off_icon_white.png')
+img_cogwheel = load_image((18, 18), 'cogwheel_icon_black.png', 'cogwheel_icon_white.png')

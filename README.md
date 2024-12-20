@@ -10,6 +10,19 @@
 ## About the project
 As part of the research conducted by the Nanoscale Spectroscopies Team, numerous microscopes are used, each accompanied by specific tools and software. This project, developed in Python, aims to centralize these devices and their functionalities within a single software platform. The goal is to simplify their management while enhancing the efficiency and productivity of research activities.
 
+## Project Configuration
+This project uses **Git Large File Storage (LFS)** to manage large files.  
+Make sure you have installed Git LFS before cloning or working on this repository.
+
+1. Download and install Git LFS: [https://git-lfs.github.com/](https://git-lfs.github.com/).
+2. Initialize Git LFS on your machine:
+    ```bash
+    git lfs install
+    ```
+3. After that, you can use the usual `git pull` command. If some files appear to be missing or corrupted, run:
+    ```bash
+    git lfs pull
+    ```
 
 ## Edit software
 If you want to improve this software, follow the steps below to set up your environment and access the script. Make sure you have the latest versions of Python and pip installed.
@@ -38,7 +51,7 @@ After making your modifications, you can build the project into an executable ap
 ````bash
 pyinstaller microview.spec
 ````
-The executable will be located in the ````/dist/MicroView```` folder within your project directory.
+The executable will be located in the `/dist` folder within your project directory.
 
 
 ## Contributors
