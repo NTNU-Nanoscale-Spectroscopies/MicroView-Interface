@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.1.4] - 2024-12-20
+### <span style="color:green"> Added </span>
+- Dev : Add files and explanations required for Git LFS to work properly. In order to be able to push large files, in particular  the release executable.
+
 ## [1.1.3] - 2024-12-19
 ### <span style="color:green"> Added </span>
 - Dev : Added detailed documentation for each method in the program
