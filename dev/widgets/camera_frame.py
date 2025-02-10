@@ -1,7 +1,10 @@
 from ..images.images import *
 from .notification import *
 import queue
+import re
 
+#Only for debug purposes
+simulate_camera_connected = False
 
 class CameraFrame(CTkFrame):
     """Class for creating a frame to control a camera"""
@@ -21,6 +24,8 @@ class CameraFrame(CTkFrame):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(3, weight=1)
         self.grid_propagate(False)
+        
+        self.default_exposure = 60
 
         if not camera:
             self.label = CTkLabel(self, text="No camera", font=("Arial", 25))
@@ -49,7 +54,9 @@ class CameraFrame(CTkFrame):
         connect : `bool`
             Wether the camera is connected
         """
-        if self.camera.connect():
+        
+        #Testing or True
+        if self.camera.connect() or simulate_camera_connected:
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
@@ -58,7 +65,7 @@ class CameraFrame(CTkFrame):
             self.image_width = None
             self.image_height = None
 
-            self.image_label = CTkLabel(self, text="")
+            self.image_label = CTkLabel(self, text="") 
             self.image_label.grid(row=0, column=1, sticky="nsew", rowspan=4)
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=(5,0), sticky="ne")
@@ -71,9 +78,41 @@ class CameraFrame(CTkFrame):
             self.save_button = CTkButton(self, text="", width=30, height=40, image=img_save, fg_color="transparent", command=self.save_image)
             self.save_button.grid(row=1, column=0, padx=5, pady=(5,0), sticky="nw")
 
+            #Frame that contains all the exposure elements
+            self.exposure_frame = CTkFrame(self, fg_color="transparent")
+            self.exposure_frame.grid(row=4, column=0, columnspan=3, padx=10, pady=(5, 5), sticky="ew")
+
+            self.exposure_frame.columnconfigure(0, weight=1)
+            self.exposure_frame.columnconfigure(1, weight=0)
+            self.exposure_frame.columnconfigure(2, weight=0) 
+            self.exposure_frame.columnconfigure(3, weight=0) 
+
+            self.exposure_slider = CTkSlider(self.exposure_frame, from_=0, to=1000, command=self.on_exposure_slider_updated)
+            self.exposure_slider.set(self.default_exposure)
+            self.exposure_slider.grid(row=0, column=0, padx=(10, 5), sticky="ew")  # Expands
+
+            self.exposure_var = StringVar(value=self.default_exposure)
+            self.exposure_var.trace_add("write", self.validate_input)
+            self.exposure_display = CTkEntry(self.exposure_frame, textvariable=self.exposure_var, width=60)
+            self.exposure_display.grid(row=0, column=1, padx=(5, 5), sticky="w")
+
+            self.exposure_label = CTkLabel(self.exposure_frame, text="ms")
+            self.exposure_label.grid(row=0, column=2, padx=(1, 5), sticky="w")
+
+            self.exposure_set = CTkButton(self.exposure_frame, text="Set", width=40, command=self.on_exposure_entry_updated)
+            self.exposure_set.grid(row=0, column=3, padx=(5, 10), sticky="w")
+
+            if simulate_camera_connected:
+                img_path = r"dev\images\debug\test_img16x9.png"
+                image = Image.open(img_path)
+                ctk_image = CTkImage(light_image=image, size=(200, 200))
+                self.image_label.configure(image=ctk_image)
+
             self.current_image = None
             if self.camera.enable: 
                 self.start_camera()
+                
+            
 
         return self.camera.connected
 
@@ -173,3 +212,53 @@ class CameraFrame(CTkFrame):
         """
         if self.camera:
             self.camera.disconnect()
+            
+            
+    def on_exposure_slider_updated(self, value):
+        """Updates the entry box and sets the camera exposure
+        
+        Parameters
+        ------------
+        value : `float`
+            Exposure value in milliseconds
+        """
+        val = round(value)
+        self.exposure_display.configure(textvariable = StringVar(value=str(val)))
+        self.on_exposure_updated(val)
+        
+        
+        
+    def on_exposure_entry_updated(self):
+        """Updates the slider and sets the camera exposure
+        """
+        str_val = self.exposure_display.get()
+        value = int(re.search(r'\d+', str_val).group())
+        self.exposure_slider.set(value)
+        self.exposure_display.configure(textvariable = StringVar(value=str(value)))
+        
+        self.on_exposure_updated(value)
+        
+        
+    def validate_input(self, *args):
+        """Restrain Entry to only numbers between 0 and 1000
+        """
+        value = self.exposure_var.get()
+        num_value = int(re.search(r'\d+', value).group())
+        
+        if num_value > 1000:
+            self.exposure_var.set("1000")
+        elif num_value < 0:
+            self.exposure_var.set("0")
+        else:
+            self.exposure_var.set(num_value)
+        
+        
+    def on_exposure_updated(self, value):
+        """Sets the camera exposure
+        
+        Parameters
+        ------------
+        value : `int`
+            Exposure value in milliseconds
+        """
+        self.camera.update_exposure(value)

@@ -30,12 +30,13 @@ class MyCamera():
         self.connected = False
         self.is_running = False
         self.image_acquisition_thread = None
-
+        self.sftt_timer = False
+        self.software_trigger_timer = threading.Timer(0.3,self.software_trigger_timer_done)
 
     def connect(self):
         """Try to establish communication with the device
 
-        Retruns
+        Returns
         ------------
         connect : `bool`
             Whether communication is established
@@ -50,7 +51,8 @@ class MyCamera():
                 self.camera.frames_per_trigger_zero_for_unlimited = 0
                 self.camera.arm(2)
                 self.camera.issue_software_trigger()
-                self.connected = self.sdk._is_sdk_open
+                self.connected = self.sdk._is_sdk_open  
+                self.software_trigger_timer.start()              
         except Exception as e:
             pass
         return self.connected
@@ -90,7 +92,29 @@ class MyCamera():
             self.camera.dispose()
             self.sdk.dispose()
             self.connected = False
+            
+    def update_exposure(self, value):
+        """Change the exposure in microseconds
+        
+            Parameters
+            ------------
+            value : `float`
+                Visible name of this device in the graphical interface
+        """
+        
+        if self.connected and self.is_running and self.sftt_timer:
+            """The time, in microseconds (us), that charge is integrated on the image sensor.
+            To convert milliseconds to microseconds, multiply the milliseconds by 1,000.
+            To convert microseconds to milliseconds, divide the microseconds by 1,000.
+            """
+            self.camera.exposure_time_us = value * 1000
+            print("Exposure time updated : ", self.camera.exposure_time_us)
+        else:
+            print(f"Can't update exposure time : \nCam connected:{self.connected}\nCam running:{self.is_running}\nTimer Finished{self.sftt_timer}")
 
+    def software_trigger_timer_done(self):
+            self.sftt_timer = True
+            print("SFTTTimer Done")
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
@@ -217,4 +241,5 @@ class ImageAcquisitionThread(threading.Thread):
         if self._is_color:
             self._mono_to_color_processor.dispose()
             self._mono_to_color_sdk.dispose()
-
+    
+    

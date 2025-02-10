@@ -67,7 +67,7 @@
 from dev.application import *
 
 # Define the application version
-version = "V1.1.4"
+version = "V2.0.1"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)

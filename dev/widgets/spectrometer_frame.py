@@ -9,6 +9,8 @@ import numpy
 import time
 import csv
 
+#Only for debug purposes (int : number of connected spectrometers)
+simulate_spectrometer_connected = 0
 
 class SpectrometerFrame(CTkFrame):
     """Class for creating a frame to control a spectrometer"""
@@ -67,7 +69,9 @@ class SpectrometerFrame(CTkFrame):
         connect : `bool`
             Wether the spectrometer is connected
         """
-        if self.spectrometer.connect():
+        
+        #Testing or simulate_spectrometer_connected > 0
+        if self.spectrometer.connect() or simulate_spectrometer_connected > 0:
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
@@ -539,7 +543,13 @@ class SpectrometerFrame(CTkFrame):
         Adjusts axis titles according to the display mode selected. 
         Displays file names in the legend in a simplified version
         """
-        file_paths = filedialog.askopenfilenames(filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+        
+        #Looks like filedialog isn't allowed to access the Desktop
+        #desktop_path = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
+        desktop_path = os.path.join(os.path.expanduser("~"))
+        print("Desktop path found : ", desktop_path)
+        file_paths = filedialog.askopenfilenames(initialdir=desktop_path ,filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+
         self.stop_spectrometer()
         if file_paths:
             if len(self.plot1.lines) == 1:

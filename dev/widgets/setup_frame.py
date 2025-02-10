@@ -69,6 +69,7 @@ class QuickSetupFrame(CTkScrollableFrame):
                 button.pack(side="left")
                 widgets.append((button,"Shutter"))
 
+            #Add device to left hand tab and setup its switch
             self.device_entries.append(DeviceEntry(switch, device, widgets, master_frame))
             switch.configure(command=lambda e=self.device_entries[-1]: self.toggle_device(e))
 
@@ -86,10 +87,14 @@ class QuickSetupFrame(CTkScrollableFrame):
         we move on to the next piece of equipment to avoid display problems
         """
         spectrometer_already_open = False
-        for entry in self.device_entries:
+        for entry in self.device_entries:            
             if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
+            
+            #Get the frame to establish a connction, or get the device name to display error message
             element = entry.frame or entry.device
             if not element.connect():
+                print(f"{entry.frame} , {entry.device}")
+                print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
                 self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
             elif isinstance(entry.device, MySpectrometer):
                 spectrometer_already_open = True
@@ -124,6 +129,7 @@ class QuickSetupFrame(CTkScrollableFrame):
 
         if entry.switch.get():
             if not element.connect():
+                print("Tried to connect to device, unsuccessful (toggle_device)")
                 self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
         else:
             element.disconnect()
@@ -141,6 +147,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         for entry in self.device_entries:
             if entry.device == frame_device:
                 entry.switch.select()
+                print("Trying to reconnect device (reconnection QuickSetupFrame)")
                 self.toggle_device(entry)
                 break
 
