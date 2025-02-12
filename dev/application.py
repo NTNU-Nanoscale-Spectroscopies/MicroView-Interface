@@ -136,7 +136,7 @@ class MyApp(CTk):
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
-        self.spectrometer_frame = SpectrometerFrame(self, self.find_device_by_type(microscope, MySpectrometer))
+        self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
@@ -207,7 +207,7 @@ class MyApp(CTk):
         
 
     def find_device_by_type(self, microscope, device_type):
-        """Returns elements of the requested type according to the microscope selected
+        """Returns element of the requested type according to the microscope selected
 
         Parameters
         ------------
@@ -223,7 +223,33 @@ class MyApp(CTk):
         """
         for device in microscope.devices:
             if isinstance(device, device_type):
+                print(device)
                 return device
+        return None
+    
+    def find_devices_by_type(self, microscope, device_type):
+        """Returns all elements of the requested type according to the microscope selected
+
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains the selected microscope for which we are looking for elements
+        device_type, `class`
+            Contains the class to be checked
+
+        Returns
+        ------------
+        find_devices_by_type : `list(class)`
+            Returns the list of objects corresponding to the requested class
+        """
+        all_devices = []
+        for device in microscope.devices:
+            if isinstance(device, device_type):
+                all_devices.append(device)
+        
+        if all_devices != []:
+            return all_devices
+        
         return None
 
 

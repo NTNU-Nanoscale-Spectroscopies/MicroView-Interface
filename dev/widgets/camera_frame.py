@@ -57,6 +57,7 @@ class CameraFrame(CTkFrame):
         
         #Testing or True
         if self.camera.connect() or simulate_camera_connected:
+                    
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
 
@@ -232,7 +233,14 @@ class CameraFrame(CTkFrame):
         """Updates the slider and sets the camera exposure
         """
         str_val = self.exposure_display.get()
-        value = int(re.search(r'\d+', str_val).group())
+        match = re.search(r'\b\d+(\.\d+)?\b', str_val)
+        if match:
+            value = float(match.group()) if '.' in match.group() else int(match.group())
+  
+            print(value)
+        else:
+            self.exposure_display.configure(textvariable = StringVar(value=""))
+            return
         self.exposure_slider.set(value)
         self.exposure_display.configure(textvariable = StringVar(value=str(value)))
         
@@ -243,14 +251,14 @@ class CameraFrame(CTkFrame):
         """Restrain Entry to only numbers between 0 and 1000
         """
         value = self.exposure_var.get()
-        num_value = int(re.search(r'\d+', value).group())
-        
-        if num_value > 1000:
-            self.exposure_var.set("1000")
-        elif num_value < 0:
-            self.exposure_var.set("0")
+        match = re.search(r'\b\d+(\.\d+)?\b', value)
+        if match:
+            num_value = float(match.group()) if '.' in match.group() else int(match.group())
         else:
-            self.exposure_var.set(num_value)
+            self.exposure_display.configure(textvariable = StringVar(value=""))
+            return
+        
+        self.exposure_var.set(num_value)
         
         
     def on_exposure_updated(self, value):
@@ -258,7 +266,11 @@ class CameraFrame(CTkFrame):
         
         Parameters
         ------------
-        value : `int`
+        value : `float`
             Exposure value in milliseconds
         """
+        #Push notification if value is lower than 100time the minimum exposure time
+        if value <= 0.04 * 100 :
+            self.master.notification(f"Warning: Low exposure time may cause lag.", color="#ffa500")
+
         self.camera.update_exposure(value)
