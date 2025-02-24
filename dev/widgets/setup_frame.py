@@ -1,3 +1,4 @@
+from dev.debugHelp import debugp
 from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
@@ -86,18 +87,33 @@ class QuickSetupFrame(CTkScrollableFrame):
         In the case of spectrometers, if a spectrometer is already connected,
         we move on to the next piece of equipment to avoid display problems
         """
-        spectrometer_already_open = False
+        
+        #spectrometer_already_open = False
         for entry in self.device_entries:            
-            if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
+            
+            # if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
             
             #Get the frame to establish a connction, or get the device name to display error message
             element = entry.frame or entry.device
-            if not element.connect():
-                print(f"{entry.frame} , {entry.device}")
-                print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
-                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
-            elif isinstance(entry.device, MySpectrometer):
-                spectrometer_already_open = True
+            
+            #If spectrometer, connect the right one if not connect the device normally
+            if isinstance(entry.device, MySpectrometer):  
+                if not element.connect(entry.device):
+                    print(f"{entry.frame} , {entry.device}")
+                    print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+            else:
+                if not element.connect():
+                    print(f"{entry.frame} , {entry.device}")
+                    print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+            
+            # elif isinstance(entry.device, MySpectrometer):
+            #     spectrometer_already_open = True
+                
+            debugp("connecting", "Connected device : " + str(element))
+              
+        debugp("connecting", "checking connected devices")  
         self.check_connected_devices()
 
 
@@ -105,6 +121,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         """For each device, update the element's graphic content to match its actual state
         """
         for entry in self.device_entries:
+            #debugp("connecting", "checking device : " + str(entry))
             entry.activate() if entry.is_device_connected() else entry.desactivate()
 
 
@@ -121,18 +138,43 @@ class QuickSetupFrame(CTkScrollableFrame):
         entry : `DeviceEntry`
             Contains all graphic elements associated with a device
         """
-        element = entry.frame or entry.device
-        if isinstance(entry.device, MySpectrometer):
-            if element.spectrometer != entry.device:
-                element.disconnect()
-                element.spectrometer = entry.device
+        # element = entry.frame or entry.device
+        # if isinstance(entry.device, MySpectrometer):
+        #     if element.spectrometer != entry.device:
+        #         element.disconnect()
+        #         element.spectrometer = entry.device
 
-        if entry.switch.get():
-            if not element.connect():
-                print("Tried to connect to device, unsuccessful (toggle_device)")
-                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+        element = entry.frame or entry.device
+        debugp("connecting", "Toggle device " + str(element))
+        
+        # if isinstance(entry.device, MySpectrometer):
+        #     for spec in element.spectrometers:
+        #         if spec != entry.device:
+        #             element.disconnect(spec)
+        #             #element.spectrometer = entry.device
+
+        if isinstance(entry.device, MySpectrometer):
+            if entry.switch.get():
+                if not element.connect(entry.device):
+                    debugp("connecting", "Spectrometer Not Connecting Manually" + str(element))
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                else:
+                    debugp("connecting", "Spectrometer Connecting Manually" + str(element))
+            else:
+                debugp("connecting", "Spectrometer Disconnecting Manually" + str(element))
+                element.disconnect(entry.device)
         else:
-            element.disconnect()
+            if entry.switch.get():
+                if not element.connect():
+                    print("Tried to connect to device, unsuccessful (toggle_device)")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                else:
+                    debugp("connecting", "Connecting " + str(element))
+            else:
+                debugp("connecting", "Disconnecting " + str(element))
+                element.disconnect()
+            
+        debugp("connecting", "Check conneced devices")
         self.check_connected_devices()
 
 

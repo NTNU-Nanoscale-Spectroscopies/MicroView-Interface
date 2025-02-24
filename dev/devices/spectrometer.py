@@ -3,6 +3,8 @@ import threading
 import queue
 import time
 
+from dev.debugHelp import debugp
+
 
 class MySpectrometer():
     """Class for creating an object that communicates with and controls a spectrometer-type device"""
@@ -58,6 +60,8 @@ class MySpectrometer():
         """Starts spectrometer data acquisition thread
         """
         if self.connected and not self.is_running:
+            debugp("Thread", "Spectrometer thread started")
+            #debugp("Thread", f"Spectrometer thread started - {self}")
             self.is_running = True
             self.data_thread = threading.Thread(target=self.acquire_data, daemon=True)
             self.data_thread.start()
@@ -76,12 +80,18 @@ class MySpectrometer():
             self.index = 0
             while self.is_running:
                 wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=self.dark_correction)
-                self.chart_queue.put((wavelengths, intensities))
+                
+                #Test faster ???
+                if not self.chart_queue.empty():
+                    self.chart_queue.get_nowait() 
+                self.chart_queue.put_nowait((wavelengths, intensities))
+                
                 if self.acquire_save_data > 0:
                     self.index += 1
                     if self.index >= self.acquire_save_data:
                         self.index = 0
                         self.save_queue.put((wavelengths, intensities))
+
         except Exception as e:
             print(f"Error in sepectrometer acquisition: {e}")
 

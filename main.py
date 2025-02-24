@@ -15,6 +15,7 @@
 #                                                                             #
 # Developpers :                                                               #
 # - Noah JACOB                                                                #
+# - Oliver MINEAU                                                             #
 #                                                                             #
 ###############################################################################
 
@@ -33,7 +34,12 @@
 #    - `MyFilter(name, serial, enable)`
 #    - `MyStage(name, serial, enable)`
 #
-# Parameter definition :
+#   Some components have their own simulator to assist with development or 
+#    debugging when not in the lab :
+#    - `MySimCamera(name, serial, enable)`
+#    - `MySimSpectrometer(name, serial, enable, dark_correction, integration_time)`
+#
+#   Parameter definition :
 #    - `name` (str): The name of the device.
 #    - `serial` (str): The unique serial number for the device.
 #    - `enable` (bool): Whether the device is activated after connection (True/False).
@@ -42,32 +48,35 @@
 #    - `model` (str): The model name of the shutter.
 #
 # 3. Combine all components into a single `MyMicroscope` instance.
-# If a parameter is not added, then its default value is None or False.
+#   If a parameter is not added, then its default value is None or False.
 #
-# Example:
-# new_microscope = MyMicroscope(
-#     "My new microscope",
-#     MyCamera("Camera", "12345", enable=True),
-#     MySpectrometer("Spectrometer", "67890", enable=True, integration_time=100),
-#     MyShutter("Shutter 1", "09876", enable=False, model="KSC101")
-#     MyShutter("Shutter 2", "54321", model="KST201")
-# )
+#   Example:
+#   new_microscope = MyMicroscope(
+#       "My new microscope",
+#       MyCamera("Camera", "12345", enable=True),
+#       MySpectrometer("Spectrometer", "67890", enable=True, integration_time=100),
+#       MyShutter("Shutter 1", "09876", enable=False, model="KSC101")
+#       MyShutter("Shutter 2", "54321", model="KST201")
+#   )
 #
 # 4. After defining microscopes, they can be passed into `MyApp` to initialize 
-# the main application and start its interface.
+#   the main application and start its interface.
 #
-# Example:
-# app = MyApp(version, size, visible_notif_time, backup_directory, new_microscope)
-# app.mainloop()
+#   Example:
+#   app = MyApp(version, size, visible_notif_time, backup_directory, new_microscope)
+#   app.mainloop()
 # -------------------------------------------------------------------------
 
 
 
 # Import necessary components from the application's module
 from dev.application import *
+from dev.devices.camera.sim_camera import MySimCamera
+from dev.devices.sim_spectrometer import MySimSpectrometer
+
 
 # Define the application version
-version = "V2.0.2"
+version = "V2.0.5"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)

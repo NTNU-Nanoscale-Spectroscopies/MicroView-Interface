@@ -3,9 +3,6 @@ from .notification import *
 import queue
 import re
 
-#Only for debug purposes
-simulate_camera_connected = False
-
 class CameraFrame(CTkFrame):
     """Class for creating a frame to control a camera"""
 
@@ -56,7 +53,7 @@ class CameraFrame(CTkFrame):
         """
         
         #Testing or True
-        if self.camera.connect() or simulate_camera_connected:
+        if self.camera.connect():
                     
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
@@ -102,12 +99,6 @@ class CameraFrame(CTkFrame):
 
             self.exposure_set = CTkButton(self.exposure_frame, text="Set", width=40, command=self.on_exposure_entry_updated)
             self.exposure_set.grid(row=0, column=3, padx=(5, 10), sticky="w")
-
-            if simulate_camera_connected:
-                img_path = r"dev\images\debug\test_img16x9.png"
-                image = Image.open(img_path)
-                ctk_image = CTkImage(light_image=image, size=(200, 200))
-                self.image_label.configure(image=ctk_image)
 
             self.current_image = None
             if self.camera.enable: 
@@ -271,6 +262,6 @@ class CameraFrame(CTkFrame):
         """
         #Push notification if value is lower than 100time the minimum exposure time
         if value <= 0.04 * 100 :
-            self.master.notification(f"Warning: Low exposure time may cause lag.", color="#ffa500")
+            self.master.notification(f"Warning: Low exposure time may cause lag in the spectrometer.", color="#ffa500")
 
         self.camera.update_exposure(value)

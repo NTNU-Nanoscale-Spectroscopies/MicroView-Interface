@@ -4,6 +4,7 @@ from .widgets.spectrometer_frame import *
 from .widgets.directory_frame import *
 from .widgets.setup_frame import *
 from .widgets.notification import *
+from .debugHelp import *
 import ctypes
 
 
@@ -142,6 +143,8 @@ class MyApp(CTk):
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
 
         self.is_menu = False
+        
+        debugp("connecting", "Check connected devices")
         self.quick_setup_frame.check_connected_devices()
 
 

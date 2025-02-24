@@ -1,3 +1,4 @@
+from dev.debugHelp import debugp
 from .windows_setup import configure_path
 from .camera_sdk.tl_camera import TLCameraSDK
 from .camera_sdk.tl_camera_enums import SENSOR_TYPE
@@ -69,12 +70,14 @@ class MyCamera():
         if self.connected and not self.is_running and not self.image_acquisition_thread:
             self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
             self.image_acquisition_thread.start()
+            debugp("Thread", "Camera thread started")
+            #debugp("Thread", f"Camera thread started - {self}")
             self.is_running = True
         return self.image_acquisition_thread.get_output_queue()
 
 
     def stop(self):
-        """Stops spectrometer data acquisition thread
+        """Stops camera data acquisition thread
         """
         if self.connected and self.is_running and self.image_acquisition_thread:
             self.image_acquisition_thread.stop()
@@ -132,6 +135,7 @@ class ImageAcquisitionThread(threading.Thread):
         camera : `MyCamera`
             Object containing all information about a camera
         """
+        
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
         self._previous_timestamp = 0
@@ -156,7 +160,8 @@ class ImageAcquisitionThread(threading.Thread):
 
         self._bit_depth = camera.bit_depth
         self._camera.image_poll_timeout_ms = 0
-        self._image_queue = queue.Queue(maxsize=2)
+        self._image_queue = queue.Queue(maxsize=1)
+        #self._image_queue = queue.SimpleQueue()
         self._stop_event = threading.Event()
 
 
@@ -232,7 +237,18 @@ class ImageAcquisitionThread(threading.Thread):
                         pil_image = self._get_color_image(frame)
                     else:
                         pil_image = self._get_image(frame)
+
+                    if self._image_queue.full:
+                        try:
+                            self._image_queue.get_nowait()
+                        except queue.Empty:
+                            pass
+
                     self._image_queue.put_nowait(pil_image)
+                    
+                #Test
+                #frame.dispose()
+                    
             except queue.Full:
                 pass
             except Exception as error:

@@ -1,3 +1,4 @@
+from dev.debugHelp import debugp
 from ..images.images import *
 from .notification import *
 
@@ -8,10 +9,6 @@ import threading
 import numpy
 import time
 import csv
-
-#Only for debug purposes (int : number of connected spectrometers)
-simulate_spectrometer_connected = 2
-
 
 class SpectrometerFrame(CTkFrame):
     """Class for creating a frame to control a spectrometer"""
@@ -39,7 +36,7 @@ class SpectrometerFrame(CTkFrame):
             self.label.grid(row=3, column=1, padx=5, pady=5)
         else:
             self.spectrometers = spectrometers
-            self.spectrometer = spectrometers[0]
+            #self.spectrometer = spectrometers[0]
             self.init()
 
 
@@ -47,9 +44,9 @@ class SpectrometerFrame(CTkFrame):
         """Creating the initial spectrometer display
         """
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
-        self.disconnected_label.grid(row=3, column=1, padx=5, pady=5)
+        self.disconnected_label.grid(row=4, column=1, padx=5, pady=5)
         self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
-        self.disconnected_button.grid(row=3, column=1, padx=5, pady=(75, 0))
+        self.disconnected_button.grid(row=4, column=1, padx=5, pady=(75, 0))
 
         self.popup = None
         self.backup_name = None
@@ -60,12 +57,19 @@ class SpectrometerFrame(CTkFrame):
         self.wavelengths, self.intensities = None, None
         self.wavelengthsTest, self.intensitiesTest = [], []
         self.light_reference, self.dark_reference = False, False
+        self.connected_spectrometers = []
+        self.graph_updating = False
+        
+        """
+        self.light_reference_wavelengths, self.light_reference_intensities = [], []
+        self.dark_reference_wavelengths, self.dark_reference_intensities = [], []
+        """
         self.light_reference_wavelengths, self.light_reference_intensities = None, None
         self.dark_reference_wavelengths, self.dark_reference_intensities = None, None
 
-        self.split = 0
+        self.split = 1
     
-    def connect(self):
+    def connect(self, device):
         """Try connecting the spectrometers. 
         If the connection is established, the frame is updated to access the associated functionality.
         In addition, if the device enable parameter is activated, the device is automatically started
@@ -76,42 +80,51 @@ class SpectrometerFrame(CTkFrame):
             Wether the spectrometer is connected
         """
         
-        self.connected_spectrometers = []
-        for spec in self.spectrometers:
-            if spec.connect() == True:
-                self.connected_spectrometers.append(spec)
-                self.wavelengthsTest.append([])
-                self.intensitiesTest.append([])
-                
-        if simulate_spectrometer_connected > 0:
-            for idx, spec in enumerate(self.spectrometers):
-                if idx > simulate_spectrometer_connected - 1:
-                    break
-                self.connected_spectrometers.append(spec)
-                self.wavelengthsTest.append([])
-                self.intensitiesTest.append([])
-                print("ADDED") # Called twice ???
+        debugp("spec", "Connecting spectrometer : " + str(device))
+        
+        if not device.connected and device.connect() == True:
+            self.connected_spectrometers.append(device)
+            self.wavelengthsTest.append([])
+            self.intensitiesTest.append([])
+            debugp("spec", "Connected spectrometer successfully : " + str(device))
+            
+        # self.connected_spectrometers = []
+        # for spec in self.spectrometers:
+        #     if spec.connect() == True:
+        #         self.connected_spectrometers.append(spec)
+        #         self.wavelengthsTest.append([])
+        #         self.intensitiesTest.append([])
+        
                        
         connected_spectrometers_count = len(self.connected_spectrometers)
+        
         #Testing or simulate_spectrometer_connected > 0   
-        if connected_spectrometers_count > 0 or simulate_spectrometer_connected > 0:
+        if connected_spectrometers_count > 0:
+            debugp("spec", "Updating Spectrometer Display")
+
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
-
+            
+            # #or ?
+            # self.disconnected_label.destroy()
+            # self.disconnected_button.destroy()
+   
             for spec in self.spectrometers:
                 spec.set_integration_time(spec.integration_time)           
             self.figure = Figure(figsize=(6, 6))
             
             #If 1 or 2 spectrometers are detected initialise the plots
-            self.plot1 = self.figure.add_subplot(connected_spectrometers_count * 100 + 11)
-            self.plot1.set_title(self.connected_spectrometers[0].name, loc="right")
-            if connected_spectrometers_count == 2:
-                self.plot2 = self.figure.add_subplot(212)
-                self.plot2.set_title(self.connected_spectrometers[1].name, loc="right")
-                
+            # self.plot1 = self.figure.add_subplot(101 + connected_spectrometers_count * 10)
+            # self.plot1.set_title(self.connected_spectrometers[0].name, loc="right")
+            # self.plot1.set_visible(False)#
+            # if connected_spectrometers_count == 2:
+            #     self.plot2 = self.figure.add_subplot(122)
+            #     self.plot2.set_title(self.connected_spectrometers[1].name, loc="right")
+            #     self.plot2.set_visible(False)#
+    
             self.plot3 = self.figure.add_subplot(111)
-            self.plot3.set_visible(False)
-
+            self.plot3.set_visible(True)
+        
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
             self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=5)
             toolbar_frame = CTkFrame(self)
@@ -119,7 +132,6 @@ class SpectrometerFrame(CTkFrame):
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
             self.toolbar.update()
    
-
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
             self.import_button = CTkButton(self, text="", width=40, height=40, image=img_plus, fg_color="transparent", command=self.import_chart)
@@ -140,44 +152,74 @@ class SpectrometerFrame(CTkFrame):
             self.reflectance_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
             self.raw_data_button = CTkButton(self, text="#", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
             self.raw_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
-            
+        
+        
             if connected_spectrometers_count > 1:  
                 self.view_button = CTkButton(self, text="", width=40, height=40, image=img_split_left, fg_color="transparent", command=self.toggle_split_screen)
                 self.view_button.grid(row=4, column=0, padx=5, pady=5, sticky="nw")
-
-            if self.spectrometer.enable:
-                self.start_spectrometer()
-
-        return self.spectrometer.connected
+        
+            #TODO 
+            # if self.spectrometer.enable:
+            #     self.start_spectrometer()
+            self.start_spectrometer(device)
+            
+        return (connected_spectrometers_count > 0)
 
 
     def reconnection(self):
         """Try reconnecting the spectrometer via `setup frame` to update the display correctly
         """
-        self.master.quick_setup_frame.reconnection(self.spectrometer)
+        self.master.quick_setup_frame.reconnection(self.spectrometers[0])
 
     
-    def disconnect(self):
+    def disconnect(self, device):
         """Stops the current thread, disconnects the spectrometer cleanly, then updates the display
         """
-        for widget in self.winfo_children():
-            widget.destroy()
-        self.init()
-        self.on_closing()
+        
+        #Remove spectrometer from connected
+        self.connected_spectrometers.remove(device)
+        device.disconnect()
+
+        self.split = 1
+        
+        if hasattr(self, 'view_button'):
+            self.view_button.destroy()
+        
+        if(len(self.connected_spectrometers) == 0):
+            self.figure.clf() 
+            for widget in self.winfo_children():
+                widget.destroy()
+            self.init()
+            self.on_closing()
 
 
-    def start_spectrometer(self):
+    def start_spectrometer(self, device):
         """Starts thread for continuous spectrometer data extraction
         """
-        self.spectrometer.start()
+        #TODO When play button clicked have to play all spectrometers.
+        
+        #print("--- Starting spectrometer")
+        # for spec in self.connected_spectrometers:
+        #     #print("Starting spec :", spec)
+        #     spec.start()
+        
+        if device in self.connected_spectrometers:
+            debugp("spec", "Starting spectrometer : " + str(device))
+            device.start()
+    
         self.pause_button.lift()
-        self.update_graph()
+        self.update_graph(True)
 
 
     def stop_spectrometer(self):
         """Stops continuous extraction of spectrometer data without disconnecting the camera
         """
-        self.spectrometer.stop()
+        
+        #TODO Stop right spectrometer not all, except if button clicked
+        
+        for spec in self.connected_spectrometers:
+            spec.stop()
+
         self.play_button.lift()
 
 
@@ -204,50 +246,19 @@ class SpectrometerFrame(CTkFrame):
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")              
 
 
-    def generate_random_spectrogram(self, index, wavelengths):
-        """For testing purposes.
-        Generates two completely different types of spectrograms."""
-        
-        noise = numpy.random.normal(0, 10, size=len(wavelengths))
-
-        if index == 0:
-            # Type 1: Smooth Gaussian-like curve
-            center = numpy.random.choice(wavelengths)
-            width = numpy.random.uniform(50, 100)
-            base_intensity = 800 * numpy.exp(-((wavelengths - center) ** 2) / (2 * width ** 2)) 
-        else:
-            # Type 2: Random spiky spectrum (simulating emission lines)
-            num_peaks = numpy.random.randint(5, 15)
-            base_intensity = numpy.zeros(len(wavelengths))
-            
-            for _ in range(num_peaks):
-                peak_position = numpy.random.choice(wavelengths)
-                peak_height = numpy.random.uniform(400, 1000)
-                peak_width = numpy.random.uniform(2, 10)
-                base_intensity += peak_height * numpy.exp(-((wavelengths - peak_position) ** 2) / (2 * peak_width ** 2))
-
-        return base_intensity + noise
-
-
-
+    #TODO Test here
     def update_plot(self, spectrometer, plot, index):
         """Updates the plot of a spectrometer with raw data, 
         or calculates reflectance/transmittance if this mode is enabled.
         """
-        if spectrometer.is_running or simulate_spectrometer_connected > 0:
-            if not spectrometer.chart_queue.empty() or simulate_spectrometer_connected > 0:
+        if spectrometer.is_running :
+            if not spectrometer.chart_queue.empty() :
                 
-                if simulate_spectrometer_connected > 0:
-                    if len(self.wavelengthsTest) >= index + 1 and len(self.intensitiesTest) >= index + 1:
-                        self.wavelengthsTest[index] = numpy.linspace(400, 700, 100)
-                        self.intensitiesTest[index] = self.generate_random_spectrogram(index, self.wavelengthsTest[index])
-                               
-                else:
-                    local_wavelengths, local_intensities = spectrometer.chart_queue.get()
-                    
-                    if len(self.wavelengthsTest) >= index + 1 and len(self.intensitiesTest) >= index + 1:
-                        self.wavelengthsTest[index] = local_wavelengths
-                        self.intensitiesTest[index] = local_intensities
+                local_wavelengths, local_intensities = spectrometer.chart_queue.get()
+                
+                if len(self.wavelengthsTest) >= index + 1 and len(self.intensitiesTest) >= index + 1:
+                    self.wavelengthsTest[index] = local_wavelengths
+                    self.intensitiesTest[index] = local_intensities
                  
                 plot.clear()
                 
@@ -272,37 +283,34 @@ class SpectrometerFrame(CTkFrame):
                 plot.grid()
 
 
-    def update_graph(self):
+    #TODO Test here
+    def update_graph(self, first_launch):
         """Updates the graph (all plots) every 20ms.
         """
-        if self.spectrometer.is_running or simulate_spectrometer_connected > 0:
-            if not self.spectrometer.chart_queue.empty() or simulate_spectrometer_connected > 0:
-                
-                """if split = 0 -> get Both plots
-                if split != 0 get plot3"""
-                
-                plots = [self.plot1] 
-                plots.append(self.plot2) if len(self.connected_spectrometers) == 2 else None
-                
-                if self.split == 0 :
-                    for i, spec in enumerate(self.connected_spectrometers):
-                        self.update_plot(spec, plots[i], i)
-                        plots[i].set_visible(True)
-                        
-                    self.plot3.set_visible(False)
-                else:
-                    for i, spec in enumerate(self.connected_spectrometers):
-                        if self.split - 1 == i:
-                            self.update_plot(spec, self.plot3, i)
-                            self.plot3.set_visible(True)
-                        plots[i].set_visible(False)
         
+        if first_launch and not self.graph_updating:
+            debugp("spec", "First time updating graph")
+            self.graph_updating = True
+
+        elif first_launch:
+            debugp("spec", "Aborted updating graph")
+            return
+        
+        if len(self.connected_spectrometers) == 1:
+            spec = self.connected_spectrometers[0]
+            if spec.is_running and not spec.chart_queue.empty():
+                self.update_plot(spec, self.plot3, 0)  
+
+        elif len(self.connected_spectrometers) > 1:
+            spec = self.connected_spectrometers[self.split-1]
+            if spec.is_running and not spec.chart_queue.empty():
+                self.update_plot(spec, self.plot3, self.split-1)
+    
+        #If image has been plotted
+        if spec.chart_queue.empty():
             self.canvas.draw()
             
-            if simulate_spectrometer_connected > 0:
-                self.after(500, self.update_graph)
-            else:
-                self.after(20, self.update_graph)
+        self.after(20, lambda : self.update_graph(False))
                 
 
     def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):
@@ -626,6 +634,7 @@ class SpectrometerFrame(CTkFrame):
             return False
 
 
+    #TODO: Modify to get light reference of both spectrometers
     def set_light_reference(self):
         """Stores light reference data
         """
@@ -639,6 +648,7 @@ class SpectrometerFrame(CTkFrame):
             self.notification(f"There is no data to save for the light reference", color="#8e0101")
 
 
+    #TODO: Modify to get dark reference of both spectrometers
     def set_dark_reference(self):
         """Stores dark reference data
         """
@@ -735,18 +745,22 @@ class SpectrometerFrame(CTkFrame):
     def on_closing(self):
         """Stops the current thread and disconnects the spectrometer cleanly
         """
-        if self.spectrometer:
-            self.backups_counts = 0
-            time.sleep(0.2)
-            self.spectrometer.disconnect()
+        for spec in self.connected_spectrometers:
+            if spec:
+                self.backups_counts = 0
+                time.sleep(0.2)
+                spec.disconnect()
             
             
     def toggle_split_screen(self):
-        self.split = (self.split + 1) % 3
+        self.split = ((self.split ) % 2) + 1
+
+        debugp("spec", "Split:" + str(self.split))
+        self.plot3.cla()
         
         if self.split == 0:
-            self.view_button.configure(image=img_split_left)
-        elif self.split == 1:
-            self.view_button.configure(image=img_split_right)
-        else:
             self.view_button.configure(image=img_split)
+        elif self.split == 1:
+            self.view_button.configure(image=img_split_left)
+        else:
+            self.view_button.configure(image=img_split_right)
