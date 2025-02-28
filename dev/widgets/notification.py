@@ -5,7 +5,7 @@ import sys
 class Notification(CTkToplevel):
     """Class for creating notifications"""
 
-    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3, alpha=0.90, width=400, height=50, corner_radius=25, border_width=2, cancel_button=True, **kwargs):
+    def __init__(self, head_message=None, message=None, border_color=None, time_before_delete=3, alpha=0.90, width=400, height=50, corner_radius=25, border_width=2, cancel_button=True, path="", **kwargs):
         """Create a notification window to inform users of potential errors
 
         Create a new CustomTkinter window, unresizable, rounded and without banner.
@@ -40,6 +40,7 @@ class Notification(CTkToplevel):
         self.overrideredirect(True)
         self.alpha = alpha
         self.attributes('-alpha', 0)
+        self.path = path
         
         if sys.platform.startswith("win"):
             self.transparent_color = self._apply_appearance_mode(self._fg_color)
@@ -63,10 +64,13 @@ class Notification(CTkToplevel):
 
         self.frame = CTkFrame(self, bg_color=self.transparent_color, corner_radius=corner_radius, border_width=border_width, border_color=border_color, **kwargs)
         self.frame.pack(expand=True, fill="both")
-        
+                    
         self.text_frame = CTkFrame(self.frame, fg_color="transparent")
         self.text_frame.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=12)
 
+        if self.path != "":
+            self.text_frame.bind("<Button-1>", self.click_button)
+               
         self.head_label = CTkLabel(self.text_frame, text=head_message, font=("Arial", 14))
         self.head_label.pack(anchor="w", side=None if message else "left")
         self.message_label = CTkLabel(self.text_frame, text=message, font=("Arial", 10))
@@ -85,7 +89,7 @@ class Notification(CTkToplevel):
 
         self.attributes('-alpha', alpha)
         self.after(time_before_delete, self.remove)
-
+        
     def remove(self):
         """Triggers the disappearing animation. When the notification is completely transparent, 
         it is removed and all upper notifications are moved to the bottom
@@ -109,9 +113,12 @@ class Notification(CTkToplevel):
 
         Parameters
         ------------
-        shift : `int`, optional
+        shift : int, optional
             Notification height offset. 0 by default
         """
         self.x = int(self.master.winfo_width() + self.master.winfo_x() - self.width * self.master.scale)
         self.y = int(self.master.winfo_height() + self.master.winfo_y() - self.height * self.master.scale - shift + 25)
         self.geometry(f"{self.width}x{self.height}+{self.x}+{self.y}")
+
+    def click_button(self, event=None):
+        os.startfile(os.path.dirname(self.path))

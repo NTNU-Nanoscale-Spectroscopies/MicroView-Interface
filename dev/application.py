@@ -267,7 +267,7 @@ class MyApp(CTk):
         self.menu()
 
 
-    def notification(self, head_message=None, message=None, color=None):
+    def notification(self, head_message=None, message=None, color=None, path=""):
         """Creates notifications attached to the main window. 
         Also supports visual stacking of notifications
 
@@ -280,7 +280,7 @@ class MyApp(CTk):
         color : `str`, optional
             Notification border color. Grey by default
         """
-        notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time)
+        notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time, path = path)
         self.notif_list.insert(0, notification)
         shift = notification.height * self.scale + 8
         for notif in self.notif_list[1:]:

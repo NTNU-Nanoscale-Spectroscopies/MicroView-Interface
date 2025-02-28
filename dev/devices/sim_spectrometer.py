@@ -57,14 +57,12 @@ class MySimSpectrometer(MySpectrometer):
                             self.index = 0
                             self.save_queue.put((wavelengths, intensities))
                     
-                    # Simulate acquisition time delay
-                    #time.sleep(self.integration_time / 1e6)
                     time.sleep(0.1)
 
             except Exception as e:
                 print(f"Error in spectrometer acquisition: {e}")
 
-    def simulate_spectrum(self, graph=1):
+    def simulate_spectrum(self):
         """Simulates wavelengths and intensities for testing purposes
 
         Parameters
@@ -73,29 +71,32 @@ class MySimSpectrometer(MySpectrometer):
             Selects between two different simulated spectra (1 or 2)
         """
 
-        # Generate wavelengths from 400 to 700 nm as float64
-        wavelengths = np.linspace(400.0, 700.0, 1024, dtype=np.float64)
-
         # Create Gaussian peaks for a simulated spectrum
         def gaussian(x, amp, cen, wid):
             return amp * np.exp(-(x - cen) ** 2 / (2 * wid ** 2)).astype(np.float64)
 
-        # Generate intensities for Graph 1
+        # Generate intensities for Graph 1 (Visible Spectrum)
         if self.name == "Spectrometer-VIS":
+            # Generate wavelengths from 400 to 700 nm as float64
+            wavelengths = np.linspace(400.0, 700.0, 1024, dtype=np.float64)
+            
             intensities = (
                 gaussian(wavelengths, 100.0, 450.0, 20.0) +  # Peak at 450 nm
                 gaussian(wavelengths, 200.0, 550.0, 30.0) +  # Peak at 550 nm
                 gaussian(wavelengths, 150.0, 620.0, 25.0)    # Peak at 620 nm
             ).astype(np.float64)
 
-        # Generate intensities for Graph 2
+        # Generate intensities for Graph 2 (Near-Infrared Spectrum)
         else:
+            # Generate wavelengths from 700 to 1000 nm as float64
+            wavelengths = np.linspace(700.0, 1000.0, 1024, dtype=np.float64)
+            
             intensities = (
-                gaussian(wavelengths, 180.0, 430.0, 15.0) +  # Peak at 430 nm
-                gaussian(wavelengths, 220.0, 500.0, 25.0) +  # Peak at 500 nm
-                gaussian(wavelengths, 160.0, 650.0, 20.0)    # Peak at 650 nm
+                gaussian(wavelengths, 180.0, 750.0, 20.0) +  # Peak at 750 nm
+                gaussian(wavelengths, 220.0, 820.0, 30.0) +  # Peak at 820 nm
+                gaussian(wavelengths, 160.0, 900.0, 25.0)    # Peak at 900 nm
             ).astype(np.float64)
-
+        
         # Add random noise to simulate real data
         noise = np.random.normal(0.0, 10.0, wavelengths.shape).astype(np.float64)
         intensities = intensities + noise
@@ -105,7 +106,8 @@ class MySimSpectrometer(MySpectrometer):
         wavelengths = wavelengths.astype(np.float64)
         intensities = intensities.astype(np.float64)
 
-        return wavelengths, intensities        
+        return wavelengths, intensities
+       
 
     def stop(self):
         """Override stop method"""

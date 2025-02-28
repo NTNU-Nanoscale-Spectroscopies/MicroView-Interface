@@ -79,7 +79,7 @@ class DirectoryFrame(CTkFrame):
         file_name = name or self.spectrometer_backup_name.get() or "Spectrum"
         file_path = os.path.expanduser(f"{self.base_directory}/{str(date.today())}/{file_name}/")
         if not os.path.exists(file_path): os.makedirs(file_path)
-        file_name += f"_#__{datetime.now():%Y%m%d}_@_{integration_time/1000}ms.txt"
+        file_name += f"_#_$__{datetime.now():%Y%m%d}_@_{integration_time/1000}ms.txt"
         return f"{file_path}{file_name}"
 
 
@@ -105,7 +105,7 @@ class DirectoryFrame(CTkFrame):
             The next available index
         """
         directory = os.path.dirname(file_path)
-        base_name = f"{file_path.split('#__')[0]}"
+        base_name = f"{file_path.split('#_$__')[0]}"
         existing_files = os.listdir(directory)
         
         while any(f.startswith(f"{os.path.basename(base_name)}{index}") for f in existing_files):

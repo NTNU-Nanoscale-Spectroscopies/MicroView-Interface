@@ -9,6 +9,7 @@ import threading
 import numpy
 import time
 import csv
+from copy import deepcopy
 
 class SpectrometerFrame(CTkFrame):
     """Class for creating a frame to control a spectrometer"""
@@ -54,19 +55,21 @@ class SpectrometerFrame(CTkFrame):
         self.reflectance_mode = False
         self.save_frequency = 1
         self.backups_counts_memorie = 10
-        self.wavelengths, self.intensities = None, None
-        self.wavelengthsTest, self.intensitiesTest = [], []
-        self.light_reference, self.dark_reference = False, False
+        self.wavelengthsList, self.intensitiesList = [], []
+        self.light_reference, self.dark_reference = [], []
+        self.light_ref_acquisition_time, self.dark_ref_acquisition_time = [], []
         self.connected_spectrometers = []
         self.graph_updating = False
         
-        """
+        
         self.light_reference_wavelengths, self.light_reference_intensities = [], []
         self.dark_reference_wavelengths, self.dark_reference_intensities = [], []
+        
         """
         self.light_reference_wavelengths, self.light_reference_intensities = None, None
         self.dark_reference_wavelengths, self.dark_reference_intensities = None, None
-
+        """
+        
         self.split = 1
     
     def connect(self, device):
@@ -84,17 +87,15 @@ class SpectrometerFrame(CTkFrame):
         
         if not device.connected and device.connect() == True:
             self.connected_spectrometers.append(device)
-            self.wavelengthsTest.append([])
-            self.intensitiesTest.append([])
-            debugp("spec", "Connected spectrometer successfully : " + str(device))
-            
-        # self.connected_spectrometers = []
-        # for spec in self.spectrometers:
-        #     if spec.connect() == True:
-        #         self.connected_spectrometers.append(spec)
-        #         self.wavelengthsTest.append([])
-        #         self.intensitiesTest.append([])
-        
+            self.wavelengthsList.append([])
+            self.intensitiesList.append([])
+            self.light_ref_acquisition_time.append([])
+            self.dark_ref_acquisition_time.append([])
+            self.light_reference_wavelengths.append([])
+            self.dark_reference_wavelengths.append([])
+            self.light_reference_intensities.append([])
+            self.dark_reference_intensities.append([])
+            debugp("spec", "Connected spectrometer successfully : " + str(device))        
                        
         connected_spectrometers_count = len(self.connected_spectrometers)
         
@@ -157,10 +158,7 @@ class SpectrometerFrame(CTkFrame):
             if connected_spectrometers_count > 1:  
                 self.view_button = CTkButton(self, text="", width=40, height=40, image=img_split_left, fg_color="transparent", command=self.toggle_split_screen)
                 self.view_button.grid(row=4, column=0, padx=5, pady=5, sticky="nw")
-        
-            #TODO 
-            # if self.spectrometer.enable:
-            #     self.start_spectrometer()
+                
             self.start_spectrometer(device)
             
         return (connected_spectrometers_count > 0)
@@ -175,7 +173,7 @@ class SpectrometerFrame(CTkFrame):
     def disconnect(self, device):
         """Stops the current thread, disconnects the spectrometer cleanly, then updates the display
         """
-        
+         
         #Remove spectrometer from connected
         self.connected_spectrometers.remove(device)
         device.disconnect()
@@ -191,9 +189,9 @@ class SpectrometerFrame(CTkFrame):
                 widget.destroy()
             self.init()
             self.on_closing()
+            
 
-
-    def start_spectrometer(self, device):
+    def start_spectrometer(self, device=None):
         """Starts thread for continuous spectrometer data extraction
         """
         #TODO When play button clicked have to play all spectrometers.
@@ -206,6 +204,10 @@ class SpectrometerFrame(CTkFrame):
         if device in self.connected_spectrometers:
             debugp("spec", "Starting spectrometer : " + str(device))
             device.start()
+        else:
+            for spec in self.connected_spectrometers:
+                debugp("spec", "Starting spectrometer : " + str(spec))
+                spec.start()
     
         self.pause_button.lift()
         self.update_graph(True)
@@ -214,10 +216,9 @@ class SpectrometerFrame(CTkFrame):
     def stop_spectrometer(self):
         """Stops continuous extraction of spectrometer data without disconnecting the camera
         """
-        
-        #TODO Stop right spectrometer not all, except if button clicked
-        
+            
         for spec in self.connected_spectrometers:
+            debugp("spec", "Stopping spectrometer : " + str(spec))
             spec.stop()
 
         self.play_button.lift()
@@ -238,15 +239,14 @@ class SpectrometerFrame(CTkFrame):
                 return
             self.reflectance_mode = True
             self.reflectance_data_button.lift()
-            if self.light_ref_acquisition_time != self.dark_ref_acquisition_time:
+            if self.light_ref_acquisition_time[self.split-1] != self.dark_ref_acquisition_time[self.split-1]:
                 self.notification(f"Light reference acquisition time differs from dark", color="#e17e00")              
-            if self.light_ref_acquisition_time != self.spectrometer.integration_time:
+            if self.light_ref_acquisition_time[self.split-1] != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Light reference acquisition time differs from current", color="#e17e00")              
-            if self.dark_ref_acquisition_time != self.spectrometer.integration_time:
+            if self.dark_ref_acquisition_time[self.split-1] != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")              
 
 
-    #TODO Test here
     def update_plot(self, spectrometer, plot, index):
         """Updates the plot of a spectrometer with raw data, 
         or calculates reflectance/transmittance if this mode is enabled.
@@ -256,28 +256,31 @@ class SpectrometerFrame(CTkFrame):
                 
                 local_wavelengths, local_intensities = spectrometer.chart_queue.get()
                 
-                if len(self.wavelengthsTest) >= index + 1 and len(self.intensitiesTest) >= index + 1:
-                    self.wavelengthsTest[index] = local_wavelengths
-                    self.intensitiesTest[index] = local_intensities
-                 
+                if len(self.wavelengthsList) >= index + 1 and len(self.intensitiesList) >= index + 1:
+                    self.wavelengthsList[index] = local_wavelengths
+                    self.intensitiesList[index] = local_intensities
+                    
                 plot.clear()
                 
                 if self.reflectance_mode:
-                    denominator = self.light_reference_intensities - self.dark_reference_intensities
+
+                    denominator = self.light_reference_intensities[index] - self.dark_reference_intensities[index]
                     denominator = numpy.where(denominator == 0, numpy.nan, denominator)
-                    self.reflectance_intensities = (self.intensities - self.dark_reference_intensities) / denominator * 100
+                                        
+                    self.reflectance_intensities = (self.intensitiesList[index] - self.dark_reference_intensities[index]) / denominator * 100
                     
+                    #TODO : Should we have multiple reflectance intensities ? Yes
                     #intensities = self.reflectance_intensities
-                    intensities = self.intensitiesTest
+                    intensities = self.reflectance_intensities
                     
                     plot.set_ylabel('Relative intensity [%]')
                     plot.set_ylim(-20, 180)
                 else:
                     #intensities = self.intensities
-                    intensities = self.intensitiesTest
+                    intensities = self.intensitiesList[index]
                     plot.set_ylabel('Intensity [counts]')
-                    
-                plot.plot(self.wavelengthsTest[index], intensities[index])
+                
+                plot.plot(self.wavelengthsList[index], intensities)
                 plot.set_xlabel('Wavelength [nm]')
                 plot.set_title(spectrometer.name, loc="right")
                 plot.grid()
@@ -301,14 +304,18 @@ class SpectrometerFrame(CTkFrame):
             if spec.is_running and not spec.chart_queue.empty():
                 self.update_plot(spec, self.plot3, 0)  
 
+                #If image has been plotted
+                if spec.chart_queue.empty():
+                    self.canvas.draw()
+                    
         elif len(self.connected_spectrometers) > 1:
             spec = self.connected_spectrometers[self.split-1]
             if spec.is_running and not spec.chart_queue.empty():
                 self.update_plot(spec, self.plot3, self.split-1)
-    
-        #If image has been plotted
-        if spec.chart_queue.empty():
-            self.canvas.draw()
+            
+                #If image has been plotted
+                if spec.chart_queue.empty():
+                    self.canvas.draw()
             
         self.after(20, lambda : self.update_graph(False))
                 
@@ -336,33 +343,45 @@ class SpectrometerFrame(CTkFrame):
         reference : `bool`, optional
             If this variable is true, then save the reflectance/transmittance data, False by default
         """
-        wavelengths = wavelengths if wavelengths is not None else self.wavelengths
-        intensities = intensities if intensities is not None else self.intensities
-        if wavelengths is not None and intensities is not None:
-            if single_save:
-                file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time)
-                counts = self.master.directory_frame.get_available_iteration(file_path)
-                file_path = file_path.replace("#", str(counts)).replace("@", f"{datetime.now():%H.%M.%S}")
+        
+        if single_save:
+            counts = None
+            for i in range(len(self.connected_spectrometers)):
+                file_path = self.master.directory_frame.get_spectrometer_directory(self.connected_spectrometers[i].integration_time)
+                if counts == None :
+                    counts = self.master.directory_frame.get_available_iteration(file_path)
+                file_path = file_path.replace("#", str(counts)).replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.connected_spectrometers[i].name.split("-")[-1])                    
+                self.single_save(file_path, wavelengths, intensities, single_save, reference, i)
+        else:
+            self.single_save(file_path, wavelengths, intensities, single_save, reference, self.split-1)
+    
+    def single_save(self, file_path, wavelengths, intensities, single_save, reference, index):      
+        local_wavelengths, local_intensities = self.connected_spectrometers[index].chart_queue.get()
+        wavelengths_to_write = wavelengths if wavelengths is not None else local_wavelengths
+        intensities_to_write = intensities if intensities is not None else local_intensities
+        if wavelengths_to_write is not None and intensities_to_write is not None:
+            
             if file_path:
                 try:
                     with open(file_path, mode='w', newline='') as file:
                         writer = csv.writer(file)
                         writer.writerow(['Wavelength [nm]', ' Intensity [counts]'])
                         writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
-                        writer.writerows(zip(wavelengths, intensities))
+                        writer.writerows(zip(wavelengths_to_write, intensities_to_write))
+                        
                     if self.reflectance_mode and not reference:
-                        denominator = self.light_reference_intensities - self.dark_reference_intensities
+                        denominator = self.light_reference_intensities[index] - self.dark_reference_intensities[index]
                         denominator = numpy.where(denominator == 0, numpy.nan, denominator)
-                        intensities = (intensities - self.dark_reference_intensities) / denominator * 100
+                        intensities = (intensities - self.dark_reference_intensities[index]) / denominator * 100
                         directory, filename = os.path.split(file_path)
                         file_path = f"{directory}/relative_{filename}"
                         with open(file_path, mode='w', newline='') as file:
                             writer = csv.writer(file)
                             writer.writerow(['Wavelength [nm]', ' Relative intensity [%]'])
                             writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
-                            writer.writerows(zip(wavelengths, intensities))
+                            writer.writerows(zip(wavelengths_to_write, intensities_to_write))
                     if single_save:
-                        self.notification(f"Successfully saved as", file_path, "#1a8300")
+                        self.notification(f"Successfully saved as", file_path, "#1a8300", path=file_path)
                         print(f"Data saved successfully to {file_path}")
                 except Exception as e:
                     print(f"Error saving data: {e}")
@@ -378,12 +397,13 @@ class SpectrometerFrame(CTkFrame):
         Waits briefly to ensure the spectrometer is initialized with the correct integration time. 
         Then, for the number of iterations requested by the user, it waits for new data to arrive and saves it accordingly.
         """
+        #Test with one spectrometer
         time.sleep((self.acquisition_time /1000) + 0.5)
-        self.spectrometer.save_queue.queue.clear()
+        self.connected_spectrometers[self.split-1].save_queue.queue.clear()
         while self.backups_counts > 0:
             self.backups_counts -= 1
-            self.wavelengths, self.intensities = self.spectrometer.save_queue.get()
-            file_name = self.file_path.replace("#", str(self.file_counts)).replace("@", f"{datetime.now():%H.%M.%S}")
+            self.wavelengthsList[self.split-1], self.intensitiesList[self.split-1] = self.connected_spectrometers[self.split-1].save_queue.get()
+            file_name = self.file_path.replace("#", str(self.file_counts)).replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.connected_spectrometers[self.split-1].name.split("-")[-1])   
             self.save_data(file_name, single_save=False)
             self.file_counts += 1
 
@@ -409,7 +429,7 @@ class SpectrometerFrame(CTkFrame):
             self.after(50, lambda: self.popup.attributes("-topmost", False))
 
             time = f"{datetime.now():%Y%m%d_%H.%M.%S}"
-            acq = (self.spectrometer.integration_time or 100000) /1000
+            acq = (self.connected_spectrometers[self.split-1].integration_time or 100000) /1000
             self.backup_name = self.backup_name or self.master.directory_frame.spectrometer_backup_name.get()
 
             title = CTkLabel(self.popup, text="Please define your backup settings :", font=("Arial", 20))
@@ -418,10 +438,11 @@ class SpectrometerFrame(CTkFrame):
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=1, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="File name :").pack(side="left", padx=(40,0))
+            name = self.connected_spectrometers[self.split-1].name.split("-")[-1]
             if self.backup_name:
-                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms",textvariable=StringVar(value=self.backup_name))
+                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_n°_{name}__{time}_{acq}ms",textvariable=StringVar(value=self.backup_name))
             else:
-                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_{time}_{acq}ms")
+                self.backup_name_entry = CTkEntry(frame, placeholder_text=f"Spectrum_n°_{name}__{time}_{acq}ms")
             self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
 
             frame = CTkFrame(self.popup, fg_color="transparent")
@@ -457,11 +478,11 @@ class SpectrometerFrame(CTkFrame):
             self.dark_reference_entry.pack(side="left", padx=0)
             if self.light_reference:
                 self.light_reference_entry.select()
-            elif self.light_reference_intensities is None:
+            elif self.light_reference_intensities[self.split-1] is None:
                 self.light_reference_entry.configure(state="disabled", border_color="gray45")
             if self.dark_reference:
                 self.dark_reference_entry.select()
-            elif self.dark_reference_intensities is None:
+            elif self.dark_reference_intensities[self.split-1] is None:
                 self.dark_reference_entry.configure(state="disabled", border_color="gray45")
 
             self.stop_after_saves_entry = CTkCheckBox(self.popup, text="Stop spectrometer after saves", border_width=2, border_color="#1F6AA5")
@@ -523,7 +544,7 @@ class SpectrometerFrame(CTkFrame):
         If so, then the advanced save popup is cleanly closed
         """
         if self.thread_finish:
-            self.spectrometer.acquire_save_data = 0
+            self.connected_spectrometers[self.split-1].acquire_save_data = 0
             self.close_popup()
         else:
             self.after(500, self.is_thread_finished)
@@ -542,24 +563,24 @@ class SpectrometerFrame(CTkFrame):
         self.stop_after_saves = self.stop_after_saves_entry.get()
         self.light_reference = self.light_reference_entry.get()
         self.dark_reference = self.dark_reference_entry.get()
-        self.spectrometer.acquire_save_data = self.save_frequency
-        self.spectrometer.set_integration_time(self.acquisition_time *1000)
-        self.file_path = self.master.directory_frame.get_spectrometer_directory(self.spectrometer.integration_time, self.backup_name_entry.get())
+        self.connected_spectrometers[self.split-1].acquire_save_data = self.save_frequency
+        self.connected_spectrometers[self.split-1].set_integration_time(self.acquisition_time *1000)
+        self.file_path = self.master.directory_frame.get_spectrometer_directory(self.connected_spectrometers[self.split-1].integration_time, self.backup_name_entry.get())
         self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
 
         self.popup.withdraw()
         reference_path = os.path.dirname(self.file_path)
         end_file = f"_{self.backup_name}_{str(self.file_counts)}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
         if self.light_reference:
-            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths, self.light_reference_intensities, False, True)
-            if self.light_ref_acquisition_time != self.spectrometer.integration_time:
+            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths[self.split-1], self.light_reference_intensities[self.split-1], False, True)
+            if self.light_ref_acquisition_time != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Light reference acquisition time differs from current", color="#e17e00")
         if self.dark_reference:
-            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths, self.dark_reference_intensities, False, True)
-            if self.dark_ref_acquisition_time != self.spectrometer.integration_time:
+            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths[self.split-1], self.dark_reference_intensities[self.split-1], False, True)
+            if self.dark_ref_acquisition_time != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
 
-        if not self.spectrometer.is_running: self.start_spectrometer()
+        if not self.connected_spectrometers[self.split-1].is_running: self.start_spectrometer()
         self.notification(f"Serial backup has begun...", color="#006bd2")
         self.save_thread = threading.Thread(target=self.advanced_save, daemon=True)
         self.save_thread.start()
@@ -638,28 +659,42 @@ class SpectrometerFrame(CTkFrame):
     def set_light_reference(self):
         """Stores light reference data
         """
-        self.light_reference_wavelengths, self.light_reference_intensities = self.wavelengths, self.intensities
-        self.light_ref_acquisition_time = self.spectrometer.integration_time
-        if self.light_reference_intensities is not None:
-            self.light_reference = True
-            self.notification(f"Light reference successfully recorded", color="#1a8300")
-        else:
-            self.light_reference = False
-            self.notification(f"There is no data to save for the light reference", color="#8e0101")
+      
+        for i in range(len(self.connected_spectrometers)):  
+            
+            wave, inten = self.connected_spectrometers[i].chart_queue.get()
+            self.light_reference_wavelengths[i] = wave.copy()
+            self.light_reference_intensities[i] = inten.copy()
+             
+            self.light_ref_acquisition_time[i] = self.connected_spectrometers[i].integration_time
+            
+            if self.light_reference_intensities[i] is not None:
+                self.light_reference = True
+                self.notification(f"Light reference successfully recorded", color="#1a8300")
+            else:
+                self.light_reference = False
+                self.notification(f"There is no data to save for the light reference", color="#8e0101")
 
 
     #TODO: Modify to get dark reference of both spectrometers
     def set_dark_reference(self):
         """Stores dark reference data
         """
-        self.dark_reference_wavelengths, self.dark_reference_intensities = self.wavelengths, self.intensities
-        self.dark_ref_acquisition_time = self.spectrometer.integration_time
-        if self.dark_reference_intensities is not None:
-            self.dark_reference = True
-            self.notification(f"Dark reference successfully recorded", color="#1a8300")
-        else:
-            self.dark_reference = False
-            self.notification(f"There is no data to save for the dark reference", color="#8e0101")
+       
+        for i in range(len(self.connected_spectrometers)):      
+            
+            wave, inten = self.connected_spectrometers[i].chart_queue.get()
+            self.dark_reference_wavelengths[i] = wave.copy()
+            self.dark_reference_intensities[i] = inten.copy()
+             
+            self.dark_ref_acquisition_time[i] = self.connected_spectrometers[i].integration_time
+       
+            if self.dark_reference_intensities[i] is not None:
+                self.dark_reference = True
+                self.notification(f"Dark reference successfully recorded", color="#1a8300")
+            else:
+                self.dark_reference = False
+                self.notification(f"There is no data to save for the dark reference", color="#8e0101")
 
 
 
@@ -669,26 +704,22 @@ class SpectrometerFrame(CTkFrame):
         Displays file names in the legend in a simplified version
         """
         
-        #Looks like filedialog isn't allowed to access the Desktop
-        #desktop_path = os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop")
-        desktop_path = os.path.join(os.path.expanduser("~"))
-        print("Desktop path found : ", desktop_path)
-        file_paths = filedialog.askopenfilenames(initialdir=desktop_path ,filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+        file_paths = filedialog.askopenfilenames(initialdir=self.master.backup_directory ,filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
 
         self.stop_spectrometer()
         if file_paths:
-            if len(self.plot1.lines) == 1:
-                self.plot1.clear()
+            if len(self.plot3.lines) == 1:
+                self.plot3.clear()
                 if self.reflectance_mode:
                     intensities = self.reflectance_intensities
-                    self.plot1.set_ylabel('Relative intensity [%]')
+                    self.plot3.set_ylabel('Relative intensity [%]')
                 else:
-                    intensities = self.intensities
-                    self.plot1.set_ylabel('Intensity [counts]')
+                    intensities = self.intensitiesList[self.split-1]
+                    self.plot3.set_ylabel('Intensity [counts]')
 
-                self.plot1.plot(self.wavelengths, intensities, label="Current")
-                self.plot1.set_xlabel('Wavelength [nm]')
-                self.plot1.grid()
+                self.plot3.plot(self.wavelengthsList[self.split-1], intensities, label="Current")
+                self.plot3.set_xlabel('Wavelength [nm]')
+                self.plot3.grid()
             
             for file_path in file_paths:
                 x, y = [], []
@@ -715,9 +746,9 @@ class SpectrometerFrame(CTkFrame):
 
 
                 legend = os.path.basename(file_path).split('__')[0]
-                self.plot1.plot(x, y, label=legend)
+                self.plot3.plot(x, y, label=legend)
 
-            self.plot1.legend()
+            self.plot3.legend()
             self.canvas.draw()
 
 
@@ -728,7 +759,7 @@ class SpectrometerFrame(CTkFrame):
         """
         self.notification(f"Coming soon !", color="#006bd2")
 
-    def notification(self, head_message=None, message=None, color=None,):
+    def notification(self, head_message=None, message=None, color=None, path=""):
         """Creates notifications attached to the main window. 
 
         Parameters
@@ -740,7 +771,7 @@ class SpectrometerFrame(CTkFrame):
         color : `str`, optional
             Notification border color. Grey by default
         """
-        self.master.notification(head_message, message, color)
+        self.master.notification(head_message, message, color, path)
 
     def on_closing(self):
         """Stops the current thread and disconnects the spectrometer cleanly
