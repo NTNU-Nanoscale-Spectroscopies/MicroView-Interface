@@ -1,3 +1,16 @@
+v2.0.6
+
+    Added :
+        All spectrometer related features work:
+        Clicking saved notification opens the folder where the file was saved
+        Import chart opens the correct folder
+        Light and Dark references are saved for all connected spetrometers at the same time
+
+    Removed :
+
+    Bugs :
+        
+
 v2.0.4
 
     Added :

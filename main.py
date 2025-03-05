@@ -76,7 +76,7 @@ from dev.devices.sim_spectrometer import MySimSpectrometer
 
 
 # Define the application version
-version = "V2.0.6"
+version = "V2.1.0"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)
@@ -85,7 +85,7 @@ size = (1200,700)
 visible_notif_time = 3
 
 # Specify the directory where data backups will be saved
-backup_directory = "C:/Users/A068/Desktop/Data"
+backup_directory = "C:/Users/A068/Documents/Data"
 #backup_directory = r"C:\Users\olive\OneDrive\Documents\LabTests"
 
 # Create an instance of a microscope setup

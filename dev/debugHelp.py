@@ -2,7 +2,7 @@ import inspect
 import os
 
 #connecting thread spec
-match_id = ["spec"]
+match_id = []
 
 def debugp(id, text):
 

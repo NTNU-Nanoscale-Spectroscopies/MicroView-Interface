@@ -37,7 +37,6 @@ class SpectrometerFrame(CTkFrame):
             self.label.grid(row=3, column=1, padx=5, pady=5)
         else:
             self.spectrometers = spectrometers
-            #self.spectrometer = spectrometers[0]
             self.init()
 
 
@@ -60,15 +59,8 @@ class SpectrometerFrame(CTkFrame):
         self.light_ref_acquisition_time, self.dark_ref_acquisition_time = [], []
         self.connected_spectrometers = []
         self.graph_updating = False
-        
-        
         self.light_reference_wavelengths, self.light_reference_intensities = [], []
         self.dark_reference_wavelengths, self.dark_reference_intensities = [], []
-        
-        """
-        self.light_reference_wavelengths, self.light_reference_intensities = None, None
-        self.dark_reference_wavelengths, self.dark_reference_intensities = None, None
-        """
         
         self.split = 1
     
@@ -99,32 +91,18 @@ class SpectrometerFrame(CTkFrame):
                        
         connected_spectrometers_count = len(self.connected_spectrometers)
         
-        #Testing or simulate_spectrometer_connected > 0   
         if connected_spectrometers_count > 0:
             debugp("spec", "Updating Spectrometer Display")
 
             self.disconnected_label.grid_forget()
             self.disconnected_button.grid_forget()
-            
-            # #or ?
-            # self.disconnected_label.destroy()
-            # self.disconnected_button.destroy()
    
             for spec in self.spectrometers:
                 spec.set_integration_time(spec.integration_time)           
             self.figure = Figure(figsize=(6, 6))
-            
-            #If 1 or 2 spectrometers are detected initialise the plots
-            # self.plot1 = self.figure.add_subplot(101 + connected_spectrometers_count * 10)
-            # self.plot1.set_title(self.connected_spectrometers[0].name, loc="right")
-            # self.plot1.set_visible(False)#
-            # if connected_spectrometers_count == 2:
-            #     self.plot2 = self.figure.add_subplot(122)
-            #     self.plot2.set_title(self.connected_spectrometers[1].name, loc="right")
-            #     self.plot2.set_visible(False)#
     
-            self.plot3 = self.figure.add_subplot(111)
-            self.plot3.set_visible(True)
+            self.plot = self.figure.add_subplot(111)
+            self.plot.set_visible(True)
         
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
             self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=5)
@@ -154,7 +132,7 @@ class SpectrometerFrame(CTkFrame):
             self.raw_data_button = CTkButton(self, text="#", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
             self.raw_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
         
-        
+            #Display graph switch button if 2 spectrometers
             if connected_spectrometers_count > 1:  
                 self.view_button = CTkButton(self, text="", width=40, height=40, image=img_split_left, fg_color="transparent", command=self.toggle_split_screen)
                 self.view_button.grid(row=4, column=0, padx=5, pady=5, sticky="nw")
@@ -194,12 +172,6 @@ class SpectrometerFrame(CTkFrame):
     def start_spectrometer(self, device=None):
         """Starts thread for continuous spectrometer data extraction
         """
-        #TODO When play button clicked have to play all spectrometers.
-        
-        #print("--- Starting spectrometer")
-        # for spec in self.connected_spectrometers:
-        #     #print("Starting spec :", spec)
-        #     spec.start()
         
         if device in self.connected_spectrometers:
             debugp("spec", "Starting spectrometer : " + str(device))
@@ -269,14 +241,11 @@ class SpectrometerFrame(CTkFrame):
                                         
                     self.reflectance_intensities = (self.intensitiesList[index] - self.dark_reference_intensities[index]) / denominator * 100
                     
-                    #TODO : Should we have multiple reflectance intensities ? Yes
-                    #intensities = self.reflectance_intensities
                     intensities = self.reflectance_intensities
                     
                     plot.set_ylabel('Relative intensity [%]')
                     plot.set_ylim(-20, 180)
                 else:
-                    #intensities = self.intensities
                     intensities = self.intensitiesList[index]
                     plot.set_ylabel('Intensity [counts]')
                 
@@ -286,7 +255,6 @@ class SpectrometerFrame(CTkFrame):
                 plot.grid()
 
 
-    #TODO Test here
     def update_graph(self, first_launch):
         """Updates the graph (all plots) every 20ms.
         """
@@ -302,18 +270,16 @@ class SpectrometerFrame(CTkFrame):
         if len(self.connected_spectrometers) == 1:
             spec = self.connected_spectrometers[0]
             if spec.is_running and not spec.chart_queue.empty():
-                self.update_plot(spec, self.plot3, 0)  
+                self.update_plot(spec, self.plot, 0)  
 
-                #If image has been plotted
                 if spec.chart_queue.empty():
                     self.canvas.draw()
                     
         elif len(self.connected_spectrometers) > 1:
             spec = self.connected_spectrometers[self.split-1]
             if spec.is_running and not spec.chart_queue.empty():
-                self.update_plot(spec, self.plot3, self.split-1)
+                self.update_plot(spec, self.plot, self.split-1)
             
-                #If image has been plotted
                 if spec.chart_queue.empty():
                     self.canvas.draw()
             
@@ -397,7 +363,7 @@ class SpectrometerFrame(CTkFrame):
         Waits briefly to ensure the spectrometer is initialized with the correct integration time. 
         Then, for the number of iterations requested by the user, it waits for new data to arrive and saves it accordingly.
         """
-        #Test with one spectrometer
+
         time.sleep((self.acquisition_time /1000) + 0.5)
         self.connected_spectrometers[self.split-1].save_queue.queue.clear()
         while self.backups_counts > 0:
@@ -570,13 +536,15 @@ class SpectrometerFrame(CTkFrame):
 
         self.popup.withdraw()
         reference_path = os.path.dirname(self.file_path)
-        end_file = f"_{self.backup_name}_{str(self.file_counts)}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
+        end_file = f"_{self.backup_name}_{str(self.file_counts)}_{self.connected_spectrometers[self.split-1].name.split('-')[-1]}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.acquisition_time}ms.txt"
         if self.light_reference:
-            self.save_data(f"{reference_path}/reference{end_file}", self.light_reference_wavelengths[self.split-1], self.light_reference_intensities[self.split-1], False, True)
+            name = f"reference{end_file}" 
+            self.save_data(f"{reference_path}/{name}", self.light_reference_wavelengths[self.split-1], self.light_reference_intensities[self.split-1], False, True)
             if self.light_ref_acquisition_time != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Light reference acquisition time differs from current", color="#e17e00")
         if self.dark_reference:
-            self.save_data(f"{reference_path}/dark{end_file}", self.dark_reference_wavelengths[self.split-1], self.dark_reference_intensities[self.split-1], False, True)
+            name = f"dark{end_file}" 
+            self.save_data(f"{reference_path}/{name}", self.dark_reference_wavelengths[self.split-1], self.dark_reference_intensities[self.split-1], False, True)
             if self.dark_ref_acquisition_time != self.connected_spectrometers[self.split-1].integration_time:
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
 
@@ -655,7 +623,6 @@ class SpectrometerFrame(CTkFrame):
             return False
 
 
-    #TODO: Modify to get light reference of both spectrometers
     def set_light_reference(self):
         """Stores light reference data
         """
@@ -676,7 +643,6 @@ class SpectrometerFrame(CTkFrame):
                 self.notification(f"There is no data to save for the light reference", color="#8e0101")
 
 
-    #TODO: Modify to get dark reference of both spectrometers
     def set_dark_reference(self):
         """Stores dark reference data
         """
@@ -708,18 +674,18 @@ class SpectrometerFrame(CTkFrame):
 
         self.stop_spectrometer()
         if file_paths:
-            if len(self.plot3.lines) == 1:
-                self.plot3.clear()
+            if len(self.plot.lines) == 1:
+                self.plot.clear()
                 if self.reflectance_mode:
                     intensities = self.reflectance_intensities
-                    self.plot3.set_ylabel('Relative intensity [%]')
+                    self.plot.set_ylabel('Relative intensity [%]')
                 else:
                     intensities = self.intensitiesList[self.split-1]
-                    self.plot3.set_ylabel('Intensity [counts]')
+                    self.plot.set_ylabel('Intensity [counts]')
 
-                self.plot3.plot(self.wavelengthsList[self.split-1], intensities, label="Current")
-                self.plot3.set_xlabel('Wavelength [nm]')
-                self.plot3.grid()
+                self.plot.plot(self.wavelengthsList[self.split-1], intensities, label="Current")
+                self.plot.set_xlabel('Wavelength [nm]')
+                self.plot.grid()
             
             for file_path in file_paths:
                 x, y = [], []
@@ -746,9 +712,9 @@ class SpectrometerFrame(CTkFrame):
 
 
                 legend = os.path.basename(file_path).split('__')[0]
-                self.plot3.plot(x, y, label=legend)
+                self.plot.plot(x, y, label=legend)
 
-            self.plot3.legend()
+            self.plot.legend()
             self.canvas.draw()
 
 
@@ -787,7 +753,7 @@ class SpectrometerFrame(CTkFrame):
         self.split = ((self.split ) % 2) + 1
 
         debugp("spec", "Split:" + str(self.split))
-        self.plot3.cla()
+        self.plot.cla()
         
         if self.split == 0:
             self.view_button.configure(image=img_split)
