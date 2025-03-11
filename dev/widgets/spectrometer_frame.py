@@ -10,6 +10,8 @@ import numpy
 import time
 import csv
 from copy import deepcopy
+from CTkToolTip import *
+
 
 class SpectrometerFrame(CTkFrame):
     """Class for creating a frame to control a spectrometer"""
@@ -26,8 +28,10 @@ class SpectrometerFrame(CTkFrame):
             Object containing all information about a spectrometer
         """
         super().__init__(master)
+        
+        self.file_system = master.file_system
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(4, weight=1)
+        self.grid_rowconfigure(5, weight=1)
         self.grid_propagate(False)
         
         self.spectrometer_count = len(spectrometers)
@@ -44,9 +48,9 @@ class SpectrometerFrame(CTkFrame):
         """Creating the initial spectrometer display
         """
         self.disconnected_label = CTkLabel(self, text="Disconnected", font=("Arial", 25))
-        self.disconnected_label.grid(row=4, column=1, padx=5, pady=5)
+        self.disconnected_label.grid(row=5, column=1, padx=5, pady=5)
         self.disconnected_button = CTkButton(self, text="", width=30, height=40,  image=img_retry, fg_color="transparent", command=self.reconnection)
-        self.disconnected_button.grid(row=4, column=1, padx=5, pady=(75, 0))
+        self.disconnected_button.grid(row=5, column=1, padx=5, pady=(75, 0))
 
         self.popup = None
         self.backup_name = None
@@ -105,7 +109,7 @@ class SpectrometerFrame(CTkFrame):
             self.plot.set_visible(True)
         
             self.canvas = FigureCanvasTkAgg(self.figure, master=self)
-            self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=5)
+            self.canvas.get_tk_widget().grid(row=0, column=1, sticky="nsew", rowspan=6)
             toolbar_frame = CTkFrame(self)
             toolbar_frame.grid(row=0, column=1, sticky="new")
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
@@ -113,29 +117,53 @@ class SpectrometerFrame(CTkFrame):
    
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
             self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+            CTkToolTip(self.fullscreen_button, delay=0.2, message="Full Screen") 
+
             self.import_button = CTkButton(self, text="", width=40, height=40, image=img_plus, fg_color="transparent", command=self.import_chart)
             self.import_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
+            CTkToolTip(self.import_button, delay=0.2, message="Import Chart") 
+
             self.light_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_on, fg_color="transparent", command=self.set_light_reference)
             self.light_reference_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
+            CTkToolTip(self.light_reference_button, delay=0.2, message="Set Light Reference") 
+
             self.dark_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_off, fg_color="transparent", command=self.set_dark_reference)
             self.dark_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
+            CTkToolTip(self.dark_reference_button, delay=0.2, message="Set Dark Reference") 
+
             self.pause_button = CTkButton(self, text="", width=40, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
             self.pause_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.pause_button, delay=0.2, message="Pause") 
+
             self.play_button = CTkButton(self, text="", width=40, height=40,  image=img_play, fg_color="transparent", command=self.start_spectrometer)
             self.play_button.grid(row=0, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.play_button, delay=0.2, message="Play") 
+
             self.save_button = CTkButton(self, text="", width=40, height=40, image=img_save, fg_color="transparent", command=self.save_data)
             self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
-            self.save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
-            self.save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.save_button, delay=0.2, message="Single Save") 
+
+            self.adv_save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
+            self.adv_save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.adv_save_button, delay=0.2, message="Advanced Save") 
+
             self.reflectance_data_button = CTkButton(self, text="%", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
             self.reflectance_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.reflectance_data_button, delay=0.2, message="Reflectance Data") 
+                        
             self.raw_data_button = CTkButton(self, text="#", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
             self.raw_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
-        
+            CTkToolTip(self.raw_data_button, delay=0.2, message="Raw Data") 
+
+            self.new_experiment_button = CTkButton(self, text="", image=img_new_experiment, width=40, height=40, fg_color="transparent", command=self.add_experiment)
+            self.new_experiment_button.grid(row=5, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.new_experiment_button, delay=0.2, message="New Experiment")
+
             #Display graph switch button if 2 spectrometers
             if connected_spectrometers_count > 1:  
                 self.view_button = CTkButton(self, text="", width=40, height=40, image=img_split_left, fg_color="transparent", command=self.toggle_split_screen)
                 self.view_button.grid(row=4, column=0, padx=5, pady=5, sticky="nw")
+                CTkToolTip(self.view_button, delay=0.2, message="Switch Spectrometer") 
                 
             self.start_spectrometer(device)
             
@@ -311,11 +339,9 @@ class SpectrometerFrame(CTkFrame):
         """
         
         if single_save:
-            counts = None
+            counts = self.file_system.get_max_spectrum_number()
             for i in range(len(self.connected_spectrometers)):
-                file_path = self.master.directory_frame.get_spectrometer_directory(self.connected_spectrometers[i].integration_time)
-                if counts == None :
-                    counts = self.master.directory_frame.get_available_iteration(file_path)
+                file_path = self.file_system.get_spectrometer_directory(self.connected_spectrometers[i].integration_time, self.connected_spectrometers[i].name)
                 file_path = file_path.replace("#", str(counts)).replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.connected_spectrometers[i].name.split("-")[-1])                    
                 self.single_save(file_path, wavelengths, intensities, single_save, reference, i)
         else:
@@ -531,8 +557,8 @@ class SpectrometerFrame(CTkFrame):
         self.dark_reference = self.dark_reference_entry.get()
         self.connected_spectrometers[self.split-1].acquire_save_data = self.save_frequency
         self.connected_spectrometers[self.split-1].set_integration_time(self.acquisition_time *1000)
-        self.file_path = self.master.directory_frame.get_spectrometer_directory(self.connected_spectrometers[self.split-1].integration_time, self.backup_name_entry.get())
-        self.file_counts = self.master.directory_frame.get_available_iteration(self.file_path)
+        self.file_path = self.file_system.get_spectrometer_directory(self.connected_spectrometers[self.split-1].integration_time, self.connected_spectrometers[self.split-1].name, self.backup_name_entry.get())
+        self.file_counts = self.file_system.get_max_spectrum_number()
 
         self.popup.withdraw()
         reference_path = os.path.dirname(self.file_path)
@@ -670,7 +696,7 @@ class SpectrometerFrame(CTkFrame):
         Displays file names in the legend in a simplified version
         """
         
-        file_paths = filedialog.askopenfilenames(initialdir=self.master.backup_directory ,filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
+        file_paths = filedialog.askopenfilenames(initialdir=self.file_system.get_backup_directory() ,filetypes=[("CSV and TXT files", "*.csv *.txt"), ("CSV files", "*.csv"), ("Text files", "*.txt")])
 
         self.stop_spectrometer()
         if file_paths:
@@ -761,3 +787,6 @@ class SpectrometerFrame(CTkFrame):
             self.view_button.configure(image=img_split_left)
         else:
             self.view_button.configure(image=img_split_right)
+            
+    def add_experiment(self):
+        self.file_system.new_spectrometer_experiment()

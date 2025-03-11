@@ -1,3 +1,5 @@
+from dev.file_system import FileSystem
+from dev.user_profile import UserProfile
 from .widgets.microscope_frame import *
 from .widgets.camera_frame import *
 from .widgets.spectrometer_frame import *
@@ -43,14 +45,13 @@ class MyApp(CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
 
-
     def menu(self):
         """Displays the application's main menu
         """
         self.selected_microscope = None
         for widget in self.winfo_children():
             widget.destroy()
-        self.title(f"MicroView")
+        self.title(f"MicroView - {self.backup_directory}")
         self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure((0, 1, 3, 4), weight=0)
@@ -132,9 +133,15 @@ class MyApp(CTk):
         self.back_button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
         self.settings_button = CTkButton(self, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
         self.settings_button.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="e")
+        
+        self.user_button = CTkButton(self, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
+        self.user_button.grid(row=0, column=1, padx=(0, 65), pady=10, sticky="e")
 
         self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
+        
+        self.file_system = FileSystem(self, self.backup_directory, self.directory_frame)
+
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
         self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
@@ -176,7 +183,7 @@ class MyApp(CTk):
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=2, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Backup directory :").pack(side="left", padx=(40,0))
-            self.backup_name_entry = CTkEntry(frame, placeholder_text=self.backup_directory, textvariable=StringVar(value=self.backup_directory))
+            self.backup_name_entry = CTkEntry(frame, placeholder_text=self.file_system.get_backup_directory(), textvariable=StringVar(value=self.file_system.get_backup_directory()))
             self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
 
             CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=3, column=0, padx=(40,20), pady=20, sticky="ew")
@@ -184,6 +191,56 @@ class MyApp(CTk):
         
         self.popup.focus_force()
 
+
+    def user_popup(self):
+        """Displays the user popup.
+        Allows users to choose their profile.
+        """
+        if not self.popup:
+            self.popup = CTkToplevel(self)
+            self.popup.title("Profile")
+            self.popup.minsize(405, 200)
+            self.center_popup(600, 300) 
+
+            self.popup.grid_rowconfigure(2, weight=1)
+            self.popup.grid_columnconfigure(0, weight=1)
+
+            self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
+            self.popup.attributes("-topmost", True)
+            self.after(50, lambda: self.popup.attributes("-topmost", False))
+
+            title = CTkLabel(self.popup, text="Choose profile :", font=("Arial", 20))
+            title.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w", columnspan=2)
+
+            input_frame = CTkFrame(self.popup, fg_color="transparent")
+            input_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew", columnspan=2)
+            input_frame.grid_columnconfigure(0, weight=1)
+
+            entry = CTkEntry(input_frame, placeholder_text="Username")
+            entry.grid(row=0, column=0, padx=(0, 5), pady=5, sticky="ew")
+
+            add = CTkButton(input_frame, text="Add", command=lambda: self.selected_user(entry.get()), width=80)
+            add.grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
+
+            scrollable_frame = CTkScrollableFrame(self.popup, fg_color="transparent")
+            scrollable_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew", columnspan=2)
+            
+            scrollable_frame.grid_columnconfigure(0, weight=1)
+            scrollable_frame.grid_columnconfigure(1, weight=1)
+
+            profile_buttons = self.file_system.get_user_names()
+            for i, name in enumerate(profile_buttons):
+                row, col = divmod(i, 2)  # Converts index to (row, column) in a 2-column layout
+                button = UserProfile(scrollable_frame, name, self.close_popup, self.selected_user)
+                button.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
+
+            self.popup.focus_force()
+
+        
+    def selected_user(self, username):
+        """Sets directory path to selected user"""
+        self.file_system.change_user(username)
+        self.close_popup()
 
     def close_popup(self):
         """Closes the settings popup cleanly
@@ -205,7 +262,7 @@ class MyApp(CTk):
             return
 
         self.visible_notif_time = float(self.visible_notif_time_entry.get())
-        self.backup_directory = self.backup_name_entry.get()
+        self.file_system.set_backup_directory(self.backup_name_entry.get())
         self.close_popup()
         
 
@@ -317,7 +374,6 @@ class MyApp(CTk):
             self.camera_frame.on_closing()
         self.stop_devices()
         self.destroy()
-
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
