@@ -1,4 +1,5 @@
 from dev.debugHelp import debugp
+from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
 from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
@@ -48,7 +49,7 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MySpectrometer):
                 master_frame = self.master.master.master.spectrometer_frame
                 entry = CTkEntry(frame, width=100, placeholder_text=device.integration_time/1000)
-                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valide_entry(d,e))
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_integ_entry(d,e))
                 label = CTkLabel(frame, text="ms")
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
@@ -69,6 +70,22 @@ class QuickSetupFrame(CTkScrollableFrame):
                 button.configure(command=lambda d=device, b=button: self.toggle_shutter(d,b))
                 button.pack(side="left")
                 widgets.append((button,"Shutter"))
+                
+            elif isinstance(device, MyRotationMount):
+                entry = CTkEntry(frame, width=50, placeholder_text="0")
+                home_btn = CTkButton(frame, text="🏠", width=30, state="disabled",     command=lambda d=device, e=entry: (e.delete(0, "end"), e.insert(0, "0"), d.home()))
+                label = CTkLabel(frame, text="°")
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_angle_entry(d,e))
+
+                home_btn.pack(side="left", padx=(10,5))
+                button.pack(side="left", padx=(10,5))
+                entry.pack(side="left")
+                label.pack(side="left", padx=3)
+                entry.configure(state="disabled")
+                widgets.append((button,""))
+                widgets.append((entry,""))
+                widgets.append((home_btn,""))
+                widgets.append((label,"NonDisableable"))
 
             #Add device to left hand tab and setup its switch
             self.device_entries.append(DeviceEntry(switch, device, widgets, master_frame))
@@ -208,7 +225,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         update_shutter_button_style(button, device)
 
 
-    def check_valide_entry(self, device, entry):
+    def check_valid_integ_entry(self, device, entry):
         """Checks the validity of content entered by users before saving it.
         If the content is inappropriate, an error notification is sent to the user
 
@@ -231,6 +248,28 @@ class QuickSetupFrame(CTkScrollableFrame):
         except:
             self.notification(f"Integration time must be a number", "#8e0101")
 
+    def check_valid_angle_entry(self, device, entry):
+        """Checks the validity of content entered by users before saving it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the input value must be a positive float between 8 and 1600000
+        
+        Parameters
+        ------------
+        device : `MyRotationMount`
+            Object containing all the information related to a rotation mount
+        entry : `CTkEntry`
+            Graphic elements associated with the rotation mount
+        """
+        try:
+            value = float(entry.get())
+            if 0 <= value <= 360:
+                device.set_absolute_angle(value)
+                self.notification(f"Set angle to {value}°", "#1a8300")
+            else:
+                self.notification(f"Angle must be between 0° and 360°", "#8e0101")
+        except:
+            self.notification(f"Integration time must be a number", "#8e0101")
 
     def update_scrollbar_visibility(self):
         """This method allows to hide/show the scrollbar according to the space available in the `setup frame`.

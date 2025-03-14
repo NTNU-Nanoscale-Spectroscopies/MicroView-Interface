@@ -63,8 +63,16 @@ class FileSystem():
     def set_backup_directory(self, backup_directory):
         """Sets the backup directory path"""
         self.backup_directory = backup_directory
+        
+        user = os.path.basename(self.backup_directory)
+        parts = backup_directory.split(os.sep)
+        if "Data" in parts:
+            ind = parts.index("Data") + 1
+            if len(parts) > ind:
+                user = parts[ind]
+
         self.update()
-        self.update_username(os.path.basename(self.backup_directory))
+        self.update_username(user)
         
     def get_user_names(self):
         """Gets the available known users"""

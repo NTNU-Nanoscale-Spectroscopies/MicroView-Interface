@@ -6,7 +6,7 @@ match_id = []
 
 def debugp(id, text):
 
-    if id.lower() not in match_id:
+    if id.lower() not in match_id and "all" not in match_id:
         return
 
     frame = inspect.stack()[1]

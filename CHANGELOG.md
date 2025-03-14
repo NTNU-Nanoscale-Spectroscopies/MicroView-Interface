@@ -1,5 +1,40 @@
 # Changelog
 
+## [2.1.2] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Added Rotation mount (COM3)
+        No auto calibration yet
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Fixed username bug when changing folder path
+
+## [2.1.1] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Added experiment button
+- Dev : Added ToolTips : Text explaining what a button does is shown when mouse hovers on button
+
+## [2.1.0] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Dual Spectrometer is fully functionnal
+
+## [2.0.6] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Split Spectrometer light/dark refs
+
+## [2.0.5] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Added Simulators
+- Dev : Split Spectrometers still under development
+
+## [2.0.2] - 2025-02-12
+### <span style="color:green"> Added </span>
+- Dev : Added start of spectrometer split screen
+
+## [2.0.1] - 2025-02-10
+### <span style="color:green"> Added </span>
+- Dev : Added camera exposure feature.
+### <span style="color:purple"> Issues </span>
+- Dev : Need to configure limits and add notification when low exposure selected
+
 ## [1.1.4] - 2024-12-20
 ### <span style="color:green"> Added </span>
 - Dev : Add files and explanations required for Git LFS to work properly. In order to be able to push large files, in particular  the release executable.
