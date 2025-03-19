@@ -830,7 +830,7 @@ class SpectrometerFrame(CTkFrame):
             
     def toggle_features(self, state):
         
-        if hasattr(self, 'view_button'):
+        if hasattr(self, 'view_button') and self.view_button:
             self.view_button.configure(state=state)
         self.fullscreen_button.configure(state=state)
         self.import_button.configure(state=state)

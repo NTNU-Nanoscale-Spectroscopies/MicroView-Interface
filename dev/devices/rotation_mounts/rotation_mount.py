@@ -58,7 +58,7 @@ class MyRotationMount():
         """The purpose of this method is to cleanly terminate communication with the device
         """
         if self.connected:
-            self.controller.close()
+            self.controller.close_connection()
             self.connected = False
 
     def set_absolute_angle(self, angle):
@@ -85,6 +85,7 @@ class MyRotationMount():
             print("No associated spectrometer")
             return
         
+        self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
         thread.start()
         self.set_unavailable()
@@ -93,6 +94,7 @@ class MyRotationMount():
         self.auto_calibrate.start()
         self.set_available()
         self.corrected_angle = self.auto_calibrate.get_zero_angle()
+        self.spectrometer.acquire_save_data = 0
         
     def get_corrected_angle(self, angle):
         return (angle - self.corrected_angle) % 360

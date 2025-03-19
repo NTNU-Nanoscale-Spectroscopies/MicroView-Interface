@@ -27,21 +27,23 @@ class AutoCalibrate():
         
         #home
         #JSP Record the spectrum of the polarized light as a reference.
-        wave_length = 500
+        wave_length = 650
         
-        angle_intensity = np.zeros((180, 2))  # Preallocate NumPy array for efficiency
+        angle_intensity = np.zeros((360, 2))  # Preallocate NumPy array for efficiency
 
         self.rotation_mount.home()
         time.sleep(0.2)
         
-        for angle in range(180):  # No need for (0, 180), range already excludes 180
+        for angle in range(360):  # No need for (0, 180), range already excludes 180
             self.rotation_mount.set_absolute_angle(angle)
             time.sleep(0.2)
 
-            wavelengths, intensities = self.spectrometer.chart_queue.get()
-
-            wave_length_index = np.where(wavelengths == wave_length)[0][0]  # Get first matching index
+            wavelengths, intensities = self.spectrometer.save_queue.get()
             
+            wave_length_index = np.where(wavelengths >= wave_length)[0][0]
+
+            print("Index : ",wave_length_index)
+
             intensity = intensities[wave_length_index]
             angle_intensity[angle] = [angle, intensity]  
 
@@ -51,6 +53,8 @@ class AutoCalibrate():
 
         max_angle, max_intensity = angle_intensity[max_idx]
         min_angle, min_intensity = angle_intensity[min_idx]
+
+        print("Data : ", angle_intensity)
 
         self.zero_angle = max_angle
         self.ninety_angle = min_angle
