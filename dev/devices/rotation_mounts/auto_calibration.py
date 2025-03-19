@@ -1,121 +1,65 @@
+import time
 import elliptec
+import numpy as np
+
+from dev.debugHelp import debugp
 
 
-class MyRotationMount():
-    """Class for creating an object that communicates with and controls a stage-type device"""
+class AutoCalibrate():
+    """Class for combining all the logic to auto calibrate a rotation mount with polarizer"""
 
-    def __init__(self, name, serial, enable=False):
-        """Create a new Stage object for easy communication with the device concerned
+    def __init__(self, rotation_mount, spectrometer):
+        """_summary_
 
-        Parameters
-        ------------
-        name : `str`
-            Visible name of this device in the graphical interface
-        serial : `str`
-            The unique device serial number enabling communication
-        enable : `bool`, optional
-            Allows or prevents the device from starting once it is connected. False by default
+        Args:
+            rotation_mount (MyRotationMount): 
+            spectrometer (MySpectrometer): 
         """
-        self.name = name
-        self.serial = serial
-        self.enable = enable
-        self.connected = False
-        self.is_running = False
-        self.controller = None
-        self.rotation_mount = None
+        self.rotation_mount = rotation_mount
+        self.spectrometer = spectrometer
+        self.zero_angle = None
+        self.ninety_angle = None
 
-    def connect(self):
-        """
-        The purpose of this method is to initiate communication with the rotation mount device
-
-        Returns
-        ------------
-        connect : `bool`
-            Whether communication is established
-        """
-
-        if self.connected == False:
-            try:
-                self.controller = elliptec.Controller(self.serial)
-                self.rotation_mount = elliptec.Rotator(self.controller)
-                self.home()
-                self.connected = True
-            except:
-                return False
+    def start(self):
+        debugp("AutoCalibration", "Starting auto calibration")
         
-        return self.connected
-
-    def disconnect(self):
-        """Not available.
-        The purpose of this method is to cleanly terminate communication with the device
-        """
-        if self.connected:
-            self.controller.close()
-            self.connected = False
-
-    def set_absolute_angle(self, angle):
-        self.rotation_mount.set_angle(angle)
+        #for each dergre, get spectrometer ?
         
-    def set_relative_angle(self, angle):
-        self.rotation_mount.shift_angle(angle)
+        #home
+        #JSP Record the spectrum of the polarized light as a reference.
+        wave_length = 500
         
-    def home(self):
+        angle_intensity = np.zeros((180, 2))  # Preallocate NumPy array for efficiency
+
         self.rotation_mount.home()
+        time.sleep(0.2)
+        
+        for angle in range(180):  # No need for (0, 180), range already excludes 180
+            self.rotation_mount.set_absolute_angle(angle)
+            time.sleep(0.2)
 
-    def __repr__(self):
-        return f"{self.name}, serial : {self.serial}"
+            wavelengths, intensities = self.spectrometer.chart_queue.get()
 
+            wave_length_index = np.where(wavelengths == wave_length)[0][0]  # Get first matching index
+            
+            intensity = intensities[wave_length_index]
+            angle_intensity[angle] = [angle, intensity]  
 
-"""
+            # Extract max and min intensities with corresponding angles
+            max_idx = np.argmax(angle_intensity[:, 1])
+            min_idx = np.argmin(angle_intensity[:, 1])
 
-import elliptec
+        max_angle, max_intensity = angle_intensity[max_idx]
+        min_angle, min_intensity = angle_intensity[min_idx]
 
-# Initialize the controller and rotation mount (Replace 'COM3' with your actual port)
-controller = elliptec.Controller('COM3')
-rot_mount = elliptec.Rotator(controller)
-
-# Retrieve device information
-print("Device Info:", rot_mount.get('info'))
-
-# Home the rotation mount (required before any movement)
-rot_mount.home()
-print("Homing completed.")
-
-# Move to an absolute position (e.g., 90 degrees)
-rot_mount.move_absolute(90)
-print("Moved to 90 degrees.")
-
-# Move relative by a certain angle (e.g., +45 degrees)
-rot_mount.move_relative(45)
-print("Moved 45 degrees forward.")
-
-# Move counterclockwise (-30 degrees)
-rot_mount.move_relative(-30)
-print("Moved 30 degrees backward.")
-
-# Query the current position
-current_pos = rot_mount.get('position')
-print(f"Current Position: {current_pos} degrees")
-
-# Get device status
-status = rot_mount.get('status')
-print("Device Status:", status)
-
-# Stop any movement (if needed)
-rot_mount.stop()
-print("Rotation stopped.")
-
-# Set velocity (if adjustable)
-rot_mount.set('velocity', 5)
-print("Velocity set to 5.")
-
-# Reset the device
-rot_mount.reset()
-print("Device reset.")
-
-# Disconnect the controller
-controller.close()
-print("Controller closed.")
-
-
-"""
+        self.zero_angle = max_angle
+        self.ninety_angle = min_angle
+        
+        print(f"Max Intensity: {max_intensity} at Angle: {max_angle}")
+        print(f"Min Intensity: {min_intensity} at Angle: {min_angle}")
+        
+    def get_zero_angle(self):
+        return self.zero_angle
+    
+    def get_ninety_angle(self):
+        return self.ninety_angle

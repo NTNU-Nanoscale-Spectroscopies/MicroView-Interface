@@ -29,6 +29,10 @@ class SpectrometerFrame(CTkFrame):
         """
         super().__init__(master)
         
+        self.is_disabled = False
+        
+        
+        
         self.file_system = master.file_system
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(5, weight=1)
@@ -165,8 +169,8 @@ class SpectrometerFrame(CTkFrame):
                 self.view_button.grid(row=4, column=0, padx=5, pady=5, sticky="nw")
                 CTkToolTip(self.view_button, delay=0.2, message="Switch Spectrometer") 
                 
-            self.start_spectrometer(device)
-            
+            self.start_spectrometer(device)    
+                        
         return (connected_spectrometers_count > 0)
 
 
@@ -790,3 +794,53 @@ class SpectrometerFrame(CTkFrame):
             
     def add_experiment(self):
         self.file_system.new_spectrometer_experiment()
+        
+    def set_unavailable(self, message):
+        self.is_disabled = True
+        self.toggle_features("disabled")
+
+        # Create a rounded rectangle frame
+        self.unavailable_message = CTkFrame(
+            self, 
+            corner_radius=0, 
+            bg_color="transparent",
+            width=300,  # Adjust width to fit text + padding
+            height=150  # Adjust height to fit text + padding
+        )  
+        self.unavailable_message.place(relx=0.5, rely=0.5, anchor="center")  
+
+        # Create a label inside the frame
+        label = CTkLabel(
+            self.unavailable_message, 
+            text=message, 
+            font=("Arial", 34), 
+            bg_color="transparent",
+            fg_color="transparent"
+        )
+        label.pack(padx=20, pady=20)
+        
+        print(f"Is Unavailable: {message}")
+        
+    def set_available(self):
+        if self.unavailable_message:
+            self.is_disabled = False
+            self.unavailable_message.destroy()
+            self.toggle_features("normal")
+            print("Set enabled")
+            
+    def toggle_features(self, state):
+        
+        if hasattr(self, 'view_button'):
+            self.view_button.configure(state=state)
+        self.fullscreen_button.configure(state=state)
+        self.import_button.configure(state=state)
+        self.light_reference_button.configure(state=state)
+        self.dark_reference_button.configure(state=state)
+        self.pause_button.configure(state=state)
+        self.play_button.configure(state=state)
+        self.save_button.configure(state=state)
+        self.adv_save_button.configure(state=state)
+        self.reflectance_data_button.configure(state=state)
+        self.raw_data_button.configure(state=state)
+        self.new_experiment_button.configure(state=state)
+    

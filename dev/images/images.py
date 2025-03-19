@@ -70,3 +70,4 @@ img_split_full = load_image((20, 20), 'split_screen_full_black.png', 'split_scre
 img_split_left = load_image((20, 20), 'split_screen_left_black.png', 'split_screen_left_white.png')
 img_split_right = load_image((20, 20), 'split_screen_right_black.png', 'split_screen_right_white.png')
 img_new_experiment = load_image((25, 25), 'new_experiment_black.png', 'new_experiment_white.png')
+img_auto_calibration = load_image((20, 20), 'automatic_calibration_black.png', 'automatic_calibration_white.png')

@@ -1,3 +1,4 @@
+from CTkToolTip import *
 from dev.debugHelp import debugp
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
 from .notification import *
@@ -74,6 +75,9 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MyRotationMount):
                 entry = CTkEntry(frame, width=50, placeholder_text="0")
                 home_btn = CTkButton(frame, text="🏠", width=30, state="disabled",     command=lambda d=device, e=entry: (e.delete(0, "end"), e.insert(0, "0"), d.home()))
+                CTkToolTip(home_btn, delay=0.2, message="Home") 
+                auto_calibration_btn = CTkButton(frame, image=img_auto_calibration, width=30, text=None, state="disabled",     command=device.start_auto_calibration)
+                CTkToolTip(auto_calibration_btn, delay=0.2, message="Auto Calibrate") 
                 label = CTkLabel(frame, text="°")
                 button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_angle_entry(d,e))
 
@@ -81,10 +85,12 @@ class QuickSetupFrame(CTkScrollableFrame):
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
                 label.pack(side="left", padx=3)
+                auto_calibration_btn.pack(side="left", padx=(10,5))
                 entry.configure(state="disabled")
                 widgets.append((button,""))
                 widgets.append((entry,""))
                 widgets.append((home_btn,""))
+                widgets.append((auto_calibration_btn,""))
                 widgets.append((label,"NonDisableable"))
 
             #Add device to left hand tab and setup its switch

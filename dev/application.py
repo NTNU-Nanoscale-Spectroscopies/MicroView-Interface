@@ -1,3 +1,4 @@
+from functools import partial
 from dev.file_system import FileSystem
 from dev.user_profile import UserProfile
 from .widgets.microscope_frame import *
@@ -149,6 +150,17 @@ class MyApp(CTk):
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
 
+        for rotation_mount in self.find_devices_by_type(microscope, MyRotationMount):
+                        
+            spectrometer_serial = rotation_mount.associated_spectrometer
+            if not spectrometer_serial:
+                continue
+            
+            spectrometer = self.find_device_by_serial(microscope, spectrometer_serial)
+            rotation_mount.setup_auto_calibration(spectrometer, partial(self.spectrometer_frame.set_unavailable,"Autocalibrating..."), self.spectrometer_frame.set_available)
+            self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
+
+        
         self.is_menu = False
         
         debugp("connecting", "Check connected devices")
@@ -278,8 +290,8 @@ class MyApp(CTk):
 
         Returns
         ------------
-        find_device_by_type : `list(class)`
-            Returns the list of objects corresponding to the requested class
+        find_device_by_type : `class`
+            Returns the object corresponding to the requested class
         """
         for device in microscope.devices:
             if isinstance(device, device_type):
@@ -312,7 +324,27 @@ class MyApp(CTk):
         
         return None
 
+    def find_device_by_serial(self, microscope, serial):
+        """Returns element of the requested serial number according to the microscope selected
 
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains the selected microscope for which we are looking for elements
+        serial, `string`
+            Contains the serial number to be checked
+
+        Returns
+        ------------
+        find_device_by_type : `class`
+            Returns the object corresponding to the requested serial number
+        """
+        for device in microscope.devices:
+            if device.serial == serial:
+                print(device)
+                return device
+        return None
+    
     def stop_devices(self):
         """Stops and disconnects all devices currently in use, 
         then returns to the main menu

@@ -1,10 +1,13 @@
+import threading
 import elliptec
+
+from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
 
 
 class MyRotationMount():
     """Class for creating an object that communicates with and controls a stage-type device"""
 
-    def __init__(self, name, serial, enable=False):
+    def __init__(self, name, serial, associated_spectrometer=None, enable=False):
         """Create a new Stage object for easy communication with the device concerned
 
         Parameters
@@ -23,6 +26,12 @@ class MyRotationMount():
         self.is_running = False
         self.controller = None
         self.rotation_mount = None
+        self.spectrometer = None
+        self.associated_spectrometer = associated_spectrometer
+        self.is_auto_calibrate = False
+        self.auto_calibrate = None
+        self.corrected_angle = 0
+        
 
     def connect(self):
         """
@@ -46,76 +55,47 @@ class MyRotationMount():
         return self.connected
 
     def disconnect(self):
-        """Not available.
-        The purpose of this method is to cleanly terminate communication with the device
+        """The purpose of this method is to cleanly terminate communication with the device
         """
         if self.connected:
             self.controller.close()
             self.connected = False
 
     def set_absolute_angle(self, angle):
-        self.rotation_mount.set_angle(angle)
+        self.rotation_mount.set_angle(self.get_corrected_angle(angle))
         
     def set_relative_angle(self, angle):
-        self.rotation_mount.shift_angle(angle)
+        self.rotation_mount.shift_angle(self.get_corrected_angle(angle))
         
     def home(self):
         self.rotation_mount.home()
+        
+    def setup_auto_calibration(self, spectrometer, set_unavailable, set_available):
+        self.spectrometer = spectrometer
+        self.is_auto_calibrate = True
+        
+        self.auto_calibrate = AutoCalibrate(self, spectrometer)
+        self.set_unavailable = set_unavailable
+        self.set_available = set_available
+        
+    def start_auto_calibration(self):
+        
+        if not self.is_auto_calibrate:
+            #TODO Notification
+            print("No associated spectrometer")
+            return
+        
+        thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
+        thread.start()
+        self.set_unavailable()
+        
+    def threaded_auto_calibration(self):
+        self.auto_calibrate.start()
+        self.set_available()
+        self.corrected_angle = self.auto_calibrate.get_zero_angle()
+        
+    def get_corrected_angle(self, angle):
+        return (angle - self.corrected_angle) % 360
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
-
-
-"""
-
-import elliptec
-
-# Initialize the controller and rotation mount (Replace 'COM3' with your actual port)
-controller = elliptec.Controller('COM3')
-rot_mount = elliptec.Rotator(controller)
-
-# Retrieve device information
-print("Device Info:", rot_mount.get('info'))
-
-# Home the rotation mount (required before any movement)
-rot_mount.home()
-print("Homing completed.")
-
-# Move to an absolute position (e.g., 90 degrees)
-rot_mount.move_absolute(90)
-print("Moved to 90 degrees.")
-
-# Move relative by a certain angle (e.g., +45 degrees)
-rot_mount.move_relative(45)
-print("Moved 45 degrees forward.")
-
-# Move counterclockwise (-30 degrees)
-rot_mount.move_relative(-30)
-print("Moved 30 degrees backward.")
-
-# Query the current position
-current_pos = rot_mount.get('position')
-print(f"Current Position: {current_pos} degrees")
-
-# Get device status
-status = rot_mount.get('status')
-print("Device Status:", status)
-
-# Stop any movement (if needed)
-rot_mount.stop()
-print("Rotation stopped.")
-
-# Set velocity (if adjustable)
-rot_mount.set('velocity', 5)
-print("Velocity set to 5.")
-
-# Reset the device
-rot_mount.reset()
-print("Device reset.")
-
-# Disconnect the controller
-controller.close()
-print("Controller closed.")
-
-
-"""

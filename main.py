@@ -78,7 +78,7 @@ from dev.devices.sim_spectrometer import MySimSpectrometer
 
 
 # Define the application version
-version = "V2.1.2"
+version = "V2.1.3"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)
@@ -95,7 +95,7 @@ gm_microscope = MyMicroscope("Maria Goeppert Mayer",
     MyCamera("Camera", "28939", enable=True),
     MySpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
     MySpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
-    MyRotationMount("Rotation Mount", "COM3", enable=False),
+    MyRotationMount("Rotation Mount", "COM3", "QEP06226", enable=False),
     MyShutter("White light - shutter", "26006167", enable=True, model="KST201"),
     MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),
     MyShutter("Laser 550nm - shutter", "68800970", enable=False, model="KSC101"),
