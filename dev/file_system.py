@@ -141,8 +141,18 @@ class FileSystem():
         return max_number + 1
      
     def update(self):
+        """
+        Updates the UI to reflect the new backup directory path.
+        """
         self.directory_frame.set_backup_directory(self.backup_directory)
         self.app.title(f"MicroView - {self.backup_directory}")
     
     def update_username(self, username):
+        """
+        Updates the UI to reflect the selected username.
+
+        Parameters:
+        username : str
+            The username to be displayed in the UI.
+        """
         self.app.user_button.configure(text=username.upper())

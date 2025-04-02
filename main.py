@@ -78,7 +78,7 @@ from dev.devices.sim_spectrometer import MySimSpectrometer
 
 
 # Define the application version
-version = "V2.1.3"
+version = "V2.1.4"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)

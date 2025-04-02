@@ -8,16 +8,18 @@ class MyRotationMount():
     """Class for creating an object that communicates with and controls a stage-type device"""
 
     def __init__(self, name, serial, associated_spectrometer=None, enable=False):
-        """Create a new Stage object for easy communication with the device concerned
+        """Initialize a new rotation mount object with communication parameters.
 
         Parameters
         ------------
         name : `str`
-            Visible name of this device in the graphical interface
+            Visible name of this device in the graphical interface.
         serial : `str`
-            The unique device serial number enabling communication
+            The unique device serial number enabling communication.
+        associated_spectrometer : optional
+            A spectrometer that may be linked to this device to allow auto calibration.
         enable : `bool`, optional
-            Allows or prevents the device from starting once it is connected. False by default
+            Allows or prevents the device from starting once it is connected. False by default.
         """
         self.name = name
         self.serial = serial
@@ -35,12 +37,12 @@ class MyRotationMount():
 
     def connect(self):
         """
-        The purpose of this method is to initiate communication with the rotation mount device
+        Establish communication with the rotation mount device.
 
         Returns
         ------------
-        connect : `bool`
-            Whether communication is established
+        `bool`
+            Whether communication is successfully established.
         """
 
         if self.connected == False:
@@ -55,22 +57,36 @@ class MyRotationMount():
         return self.connected
 
     def disconnect(self):
-        """The purpose of this method is to cleanly terminate communication with the device
-        """
+        """Terminate communication with the device cleanly."""
         if self.connected:
             self.controller.close_connection()
             self.connected = False
 
     def set_absolute_angle(self, angle):
+        """Set the rotation mount to a specified absolute angle after correction."""
         self.rotation_mount.set_angle(self.get_corrected_angle(angle))
         
     def set_relative_angle(self, angle):
+        """Shift the rotation mount by a relative angle after correction."""
         self.rotation_mount.shift_angle(self.get_corrected_angle(angle))
         
     def home(self):
+        """Move the rotation mount to its home position."""
         self.rotation_mount.home()
         
     def setup_auto_calibration(self, spectrometer, set_unavailable, set_available):
+        """
+        Configure auto-calibration with a spectrometer and status update functions.
+
+        Parameters
+        ------------
+        spectrometer : object
+            The spectrometer associated with the rotation mount.
+        set_unavailable : function
+            Function to set the device as unavailable during calibration.
+        set_available : function
+            Function to set the device as available after calibration.
+        """
         self.spectrometer = spectrometer
         self.is_auto_calibrate = True
         
@@ -79,7 +95,7 @@ class MyRotationMount():
         self.set_available = set_available
         
     def start_auto_calibration(self):
-        
+        """Start the auto-calibration process in a separate thread."""
         if not self.is_auto_calibrate:
             #TODO Notification
             print("No associated spectrometer")
@@ -91,12 +107,14 @@ class MyRotationMount():
         self.set_unavailable()
         
     def threaded_auto_calibration(self):
+        """Execute the auto-calibration routine in a separate thread."""
         self.auto_calibrate.start()
         self.set_available()
         self.corrected_angle = self.auto_calibrate.get_zero_angle()
         self.spectrometer.acquire_save_data = 0
         
     def get_corrected_angle(self, angle):
+        """Calculate the corrected angle based on calibration adjustments."""
         return (angle - self.corrected_angle) % 360
 
     def __repr__(self):

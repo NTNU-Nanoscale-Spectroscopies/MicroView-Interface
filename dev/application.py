@@ -1,4 +1,6 @@
 from functools import partial
+from tkinter import Canvas, PhotoImage
+from dev.devices.camera.dlls.import_lib import import_thorlab_lib
 from dev.file_system import FileSystem
 from dev.user_profile import UserProfile
 from .widgets.microscope_frame import *
@@ -45,6 +47,8 @@ class MyApp(CTk):
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.menu()
+        
+
 
     def menu(self):
         """Displays the application's main menu
@@ -71,6 +75,11 @@ class MyApp(CTk):
         self.button = CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicth_theme_mode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
         self.update_idletasks()
+        
+        module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
+        module.ThorlabsSetup(self)
+        
+        
 
 
     def swicth_theme_mode(self):
@@ -157,6 +166,9 @@ class MyApp(CTk):
                 continue
             
             spectrometer = self.find_device_by_serial(microscope, spectrometer_serial)
+            if not spectrometer:
+                continue
+            
             rotation_mount.setup_auto_calibration(spectrometer, partial(self.spectrometer_frame.set_unavailable,"Autocalibrating..."), self.spectrometer_frame.set_available)
             self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
 
@@ -431,3 +443,17 @@ class MyMicroscope:
 
     def __repr__(self):
         return f"Devices in the {self.name} microscope :\n\t" + "\n\t".join([f"{device}" for device in self.devices]) + "\n"
+
+
+
+
+
+
+
+
+
+
+
+
+
+

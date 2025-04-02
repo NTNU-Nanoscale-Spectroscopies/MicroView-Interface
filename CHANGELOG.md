@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.4] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Added comments
+
+## [2.1.3] - 2025-02-24
+### <span style="color:green"> Added </span>
+- Dev : Added auto calibration 
+
 ## [2.1.2] - 2025-02-24
 ### <span style="color:green"> Added </span>
 - Dev : Added Rotation mount (COM3)

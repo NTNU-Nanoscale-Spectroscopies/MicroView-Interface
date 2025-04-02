@@ -3,3 +3,5 @@ venv/
 .venv/
 .DS_Store
 build
+testRotator.py
+file_name.py

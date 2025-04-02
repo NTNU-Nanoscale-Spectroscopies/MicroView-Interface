@@ -1,10 +1,24 @@
 import inspect
 import os
 
-#connecting thread spec
-match_id = ["all"]
+#Add id of message to be printed
+match_id = []
+# match_id.append("connecting")
+# match_id.append("thread")
+# match_id.append("spec")
+match_id.append("all")
 
 def debugp(id, text):
+    """
+    Prints debug messages if the provided ID is in the match_id set.
+
+    Parameters:
+    id (str): Identifier to check against match_id.
+    text (str): Debug message to print.
+
+    Returns:
+    None
+    """
 
     if id.lower() not in match_id and "all" not in match_id:
         return

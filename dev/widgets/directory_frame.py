@@ -56,4 +56,10 @@ class DirectoryFrame(CTkFrame):
         return f"{file_path}{file_name}"
 
     def set_backup_directory(self, path):
+        """Sets backup directory to new path
+        Parameters
+        ------------
+        path : `string`
+            new path to backup directory
+        """
         self.base_directory = path
