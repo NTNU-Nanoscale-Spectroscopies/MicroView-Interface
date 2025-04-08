@@ -64,12 +64,20 @@ class SpectrometerFrame(CTkFrame):
         self.backups_counts_memorie = 10
         self.wavelengthsList, self.intensitiesList = [], []
         self.light_reference, self.dark_reference = [], []
+        
+        self.last_saved_light_reference = []
+        self.last_saved_dark_reference = []
+        self.last_saved_light_reference_wavelengths = []
+        self.last_saved_light_reference_intensities = []
+        self.last_saved_dark_reference_wavelengths = []
+        self.last_saved_dark_reference_intensities = []
+        
         self.light_ref_acquisition_time, self.dark_ref_acquisition_time = [], []
         self.connected_spectrometers = []
         self.graph_updating = False
         self.light_reference_wavelengths, self.light_reference_intensities = [], []
         self.dark_reference_wavelengths, self.dark_reference_intensities = [], []
-        
+     
         self.split = 1
     
     def connect(self, device):
@@ -95,6 +103,10 @@ class SpectrometerFrame(CTkFrame):
             self.dark_reference_wavelengths.append([])
             self.light_reference_intensities.append([])
             self.dark_reference_intensities.append([])
+            self.last_saved_light_reference_wavelengths.append(numpy.array([]))
+            self.last_saved_dark_reference_wavelengths.append(numpy.array([]))
+            self.last_saved_light_reference_intensities.append(numpy.array([]))
+            self.last_saved_dark_reference_intensities.append(numpy.array([]))
             debugp("spec", "Connected spectrometer successfully : " + str(device))        
                        
         connected_spectrometers_count = len(self.connected_spectrometers)
@@ -147,20 +159,20 @@ class SpectrometerFrame(CTkFrame):
             self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
             CTkToolTip(self.save_button, delay=0.2, message="Single Save") 
 
-            self.adv_save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
-            self.adv_save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
-            CTkToolTip(self.adv_save_button, delay=0.2, message="Advanced Save") 
+            # self.adv_save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
+            # self.adv_save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
+            # CTkToolTip(self.adv_save_button, delay=0.2, message="Advanced Save") 
 
             self.reflectance_data_button = CTkButton(self, text="%", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
-            self.reflectance_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
+            self.reflectance_data_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
             CTkToolTip(self.reflectance_data_button, delay=0.2, message="Reflectance Data") 
                         
             self.raw_data_button = CTkButton(self, text="#", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
-            self.raw_data_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
+            self.raw_data_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
             CTkToolTip(self.raw_data_button, delay=0.2, message="Raw Data") 
 
             self.new_experiment_button = CTkButton(self, text="", image=img_new_experiment, width=40, height=40, fg_color="transparent", command=self.add_experiment)
-            self.new_experiment_button.grid(row=5, column=0, padx=5, pady=5, sticky="nw")
+            self.new_experiment_button.grid(row=3, column=0, padx=5, pady=5, sticky="nw")
             CTkToolTip(self.new_experiment_button, delay=0.2, message="New Experiment")
 
             #Display graph switch button if 2 spectrometers
@@ -341,17 +353,90 @@ class SpectrometerFrame(CTkFrame):
         reference : `bool`, optional
             If this variable is true, then save the reflectance/transmittance data, False by default
         """
-        
+        #Used for Single Save 
         if single_save:
+            
             counts = self.file_system.get_max_spectrum_number()
             for i in range(len(self.connected_spectrometers)):
+
                 file_path = self.file_system.get_spectrometer_directory(self.connected_spectrometers[i].integration_time, self.connected_spectrometers[i].name)
                 file_path = file_path.replace("#", str(counts)).replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.connected_spectrometers[i].name.split("-")[-1])                    
+                
+                ref_file_path = self.file_system.get_spectrometer_directory(self.connected_spectrometers[i].integration_time, self.connected_spectrometers[i].name, "")
+
+                #Add save refs here
+                self.save_references(ref_file_path, self.connected_spectrometers[i].integration_time, i, counts)
+                
                 self.single_save(file_path, wavelengths, intensities, single_save, reference, i)
+        
+        #Used for Advanced Save
         else:
             self.single_save(file_path, wavelengths, intensities, single_save, reference, self.split-1)
     
-    def single_save(self, file_path, wavelengths, intensities, single_save, reference, index):      
+    def save_references(self, ref_file_path, acquisition_time, index, file_index):
+       
+        self.save_light_reference = False
+        self.save_dark_reference = False
+        
+        if self.light_reference:
+            # Get the relevant arrays
+            curr_wavelengths = self.light_reference_wavelengths[index]
+            curr_intensities = self.light_reference_intensities[index]
+            prev_wavelengths = self.last_saved_light_reference_wavelengths[index]
+            prev_intensities = self.last_saved_light_reference_intensities[index]
+
+            # Check if the previous arrays are not empty and shapes match
+            wavelengths_changed = (prev_wavelengths.shape != curr_wavelengths.shape) or not numpy.array_equal(curr_wavelengths, prev_wavelengths)
+            intensities_changed = (prev_intensities.shape != curr_intensities.shape) or not numpy.array_equal(curr_intensities, prev_intensities)
+
+            if wavelengths_changed or intensities_changed:
+                self.save_light_reference = True
+                self.last_saved_light_reference_wavelengths[index] = self.light_reference_wavelengths[index].copy()
+                self.last_saved_light_reference_intensities[index] = self.light_reference_intensities[index].copy()
+                debugp("MoveSave", f"Set save_light_reference")
+        
+        
+        if self.dark_reference:
+            # Get the relevant arrays
+            curr_wavelengths = self.dark_reference_wavelengths[index]
+            curr_intensities = self.dark_reference_intensities[index]
+            prev_wavelengths = self.last_saved_dark_reference_wavelengths[index]
+            prev_intensities = self.last_saved_dark_reference_intensities[index]
+
+            # Check if the previous arrays are not empty and shapes match
+            wavelengths_changed = (prev_wavelengths.shape != curr_wavelengths.shape) or not numpy.array_equal(curr_wavelengths, prev_wavelengths)
+            intensities_changed = (prev_intensities.shape != curr_intensities.shape) or not numpy.array_equal(curr_intensities, prev_intensities)
+
+            if wavelengths_changed or intensities_changed:
+                self.save_dark_reference = True
+                self.last_saved_dark_reference_wavelengths[index] = self.dark_reference_wavelengths[index].copy()
+                self.last_saved_dark_reference_intensities[index] = self.dark_reference_intensities[index].copy()
+                debugp("MoveSave", f"Set save_dark_reference")
+        
+        
+
+        reference_path = os.path.dirname(ref_file_path)
+        end_file = f"_{''}_{str(file_index)}_{self.connected_spectrometers[index].name.split('-')[-1]}__{datetime.now():%Y%m%d_%H.%M.%S}_{acquisition_time}ms.txt"
+        if self.save_light_reference:
+            name = f"reference{end_file}" 
+            debugp("SaveRef", "Saving Light ref")
+            self.single_save(f"{reference_path}/{name}", self.light_reference_wavelengths[index], self.light_reference_intensities[index], True, True, index)
+            
+            if self.light_ref_acquisition_time[index] != self.connected_spectrometers[index].integration_time:
+                debugp("Acq Time L", f"{self.light_ref_acquisition_time[index]} {self.connected_spectrometers[index].integration_time}")
+                self.notification(f"Light reference acquisition time differs from current", color="#e17e00")
+        
+        if self.save_dark_reference:
+            name = f"dark{end_file}" 
+            debugp("SaveRef", "Saving Dark ref")
+            self.single_save(f"{reference_path}/{name}", self.dark_reference_wavelengths[index], self.dark_reference_intensities[index], True, True, index)
+            
+            if self.dark_ref_acquisition_time[index] != self.connected_spectrometers[index].integration_time:
+                debugp("Acq Time D", f"{self.dark_ref_acquisition_time[index]} {self.connected_spectrometers[index].integration_time}")
+                self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
+
+    
+    def single_save(self, file_path, wavelengths, intensities, single_save, reference, index):    
         local_wavelengths, local_intensities = self.connected_spectrometers[index].chart_queue.get()
         wavelengths_to_write = wavelengths if wavelengths is not None else local_wavelengths
         intensities_to_write = intensities if intensities is not None else local_intensities

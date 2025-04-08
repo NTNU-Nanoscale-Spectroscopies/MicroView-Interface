@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.5] - 2025-04-08
+### <span style="color:green"> Added </span>
+- Dev : Save button saves light and dark references when updated.
+### <span style="color:#bf2a2a"> Removed </span>
+- Dev : Removed Advanced Save button
+
 ## [2.1.4] - 2025-02-24
 ### <span style="color:green"> Added </span>
 - Dev : Added comments
