@@ -52,7 +52,7 @@ class AutoCalibrate():
         max_angle, max_intensity = angle_intensity[max_idx]
         min_angle, min_intensity = angle_intensity[min_idx]
 
-        #plot_data(angle_intensity)
+        plot_data(angle_intensity)
 
         self.zero_angle = max_angle
         self.ninety_angle = min_angle

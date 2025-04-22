@@ -473,6 +473,7 @@ class SpectrometerFrame(CTkFrame):
             self.notification(f"No data to save", color="#8e0101")
     
     
+    ##Not in use anymore
     def advanced_save(self):
         """Handles the advanced save process for spectrometer data.
         Waits briefly to ensure the spectrometer is initialized with the correct integration time. 
@@ -493,7 +494,7 @@ class SpectrometerFrame(CTkFrame):
         self.notification(f"Serial backup completed !", color="#1a8300")
         self.thread_finish = True
 
-
+    ##Not in use anymore
     def advanced_save_popup(self):
         """Displays the advanced save popup.
         Allows users to configure a data backup sequence
@@ -630,7 +631,7 @@ class SpectrometerFrame(CTkFrame):
         else:
             self.after(500, self.is_thread_finished)
     
-
+    ##Not in use anymore
     def start_save_thread(self):
         """Checks that all fields entered by the user are correct. 
         If so, initialize and start the advanced save thread

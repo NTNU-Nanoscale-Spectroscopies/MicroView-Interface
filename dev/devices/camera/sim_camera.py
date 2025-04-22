@@ -92,9 +92,12 @@ class MySimCamera(MyCamera):
             print(f"Can't update exposure time : \nCam connected:{self.connected}\nCam running:{self.is_running}\nTimer Finished{self.sftt_timer}")
 
     def software_trigger_timer_done(self):
-            self.sftt_timer = True
-            print("SFTTTimer Done")
+        self.sftt_timer = True
+        print("SFTTTimer Done")
 
+    def isPluggedIn(self):
+        return True
+    
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
 

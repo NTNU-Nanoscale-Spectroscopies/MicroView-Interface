@@ -46,7 +46,10 @@ class MyApp(CTk):
         self.center_window(size[0], size[1])
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.menu()
+        
+        self.autoConnect()
+        
+        #self.menu()
         
 
 
@@ -76,8 +79,11 @@ class MyApp(CTk):
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
         self.update_idletasks()
         
-        module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
-        module.ThorlabsSetup(self)
+        try:
+            module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
+            module.ThorlabsSetup(self)
+        except:
+            debugp()
         
         
 
@@ -119,6 +125,16 @@ class MyApp(CTk):
         y = int((self.winfo_height()/2) + self.winfo_y() - (height/2))
         self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
+    def autoConnect(self):
+        for m in self.microscopes:
+            for d in m.devices:
+                if isinstance(d, MyCamera) and d.isPluggedIn():
+                    self.go_to_microscope(m)  
+                    return    
+        
+        debugp("AutoConnect", "No Device Detected")
+        
+        self.menu()              
 
     def go_to_microscope(self, microscope):
         """Displays the microscope config panel

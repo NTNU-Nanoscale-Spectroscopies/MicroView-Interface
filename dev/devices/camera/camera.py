@@ -118,6 +118,11 @@ class MyCamera():
     def software_trigger_timer_done(self):
             self.sftt_timer = True
             print("SFTTTimer Done")
+            
+    def isPluggedIn(self):
+        sdk = TLCameraSDK()
+        camera_list = sdk.discover_available_cameras()
+        return self.serial in camera_list
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
