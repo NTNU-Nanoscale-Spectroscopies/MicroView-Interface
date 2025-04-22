@@ -47,9 +47,8 @@ class MyApp(CTk):
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         
-        self.autoConnect()
+        self.menu()       
         
-        #self.menu()
         
 
 
@@ -83,9 +82,9 @@ class MyApp(CTk):
             module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
             module.ThorlabsSetup(self)
         except:
-            debugp()
+            debugp("","")
         
-        
+        self.autoConnect()
 
 
     def swicth_theme_mode(self):
@@ -132,9 +131,7 @@ class MyApp(CTk):
                     self.go_to_microscope(m)  
                     return    
         
-        debugp("AutoConnect", "No Device Detected")
-        
-        self.menu()              
+        debugp("AutoConnect", "No Device Detected")              
 
     def go_to_microscope(self, microscope):
         """Displays the microscope config panel
