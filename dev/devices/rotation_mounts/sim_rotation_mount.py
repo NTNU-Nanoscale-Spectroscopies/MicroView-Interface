@@ -31,6 +31,7 @@ class MySimRotationMount(MyRotationMount):
         self.rotation_mount = None
         self.spectrometer = None
         self.associated_spectrometer = associated_spectrometer
+        self.spectrometer_frame = None
         self.is_auto_calibrate = False
         self.auto_calibrate = None
         self.corrected_angle = 0
@@ -68,7 +69,7 @@ class MySimRotationMount(MyRotationMount):
         """Move the rotation mount to its home position."""
         debugp("Rotation Mount", f"Homed")
 
-    def setup_auto_calibration(self, spectrometer, set_unavailable, set_available):
+    def setup_auto_calibration(self, spectrometer, spectrometer_frame, set_unavailable, set_available):
         """
         Configure auto-calibration with a spectrometer and status update functions.
 
@@ -82,9 +83,10 @@ class MySimRotationMount(MyRotationMount):
             Function to set the device as available after calibration.
         """
         self.spectrometer = spectrometer
+        self.spectrometer_frame = spectrometer_frame
         self.is_auto_calibrate = True
         
-        self.auto_calibrate = AutoCalibrate(self, spectrometer)
+        self.auto_calibrate = AutoCalibrate(self, spectrometer, spectrometer_frame)
         self.set_unavailable = set_unavailable
         self.set_available = set_available
         
@@ -95,6 +97,7 @@ class MySimRotationMount(MyRotationMount):
             print("No associated spectrometer")
             return
         
+        self.corrected_angle = 0
         self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
         thread.start()

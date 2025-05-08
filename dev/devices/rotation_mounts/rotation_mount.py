@@ -30,6 +30,7 @@ class MyRotationMount():
         self.rotation_mount = None
         self.spectrometer = None
         self.associated_spectrometer = associated_spectrometer
+        self.spectrometer_frame = None
         self.is_auto_calibrate = False
         self.auto_calibrate = None
         self.corrected_angle = 0
@@ -74,7 +75,7 @@ class MyRotationMount():
         """Move the rotation mount to its home position."""
         self.rotation_mount.home()
         
-    def setup_auto_calibration(self, spectrometer, set_unavailable, set_available):
+    def setup_auto_calibration(self, spectrometer, spectrometer_frame, set_unavailable, set_available):
         """
         Configure auto-calibration with a spectrometer and status update functions.
 
@@ -88,9 +89,10 @@ class MyRotationMount():
             Function to set the device as available after calibration.
         """
         self.spectrometer = spectrometer
+        self.spectrometer_frame = spectrometer_frame
         self.is_auto_calibrate = True
         
-        self.auto_calibrate = AutoCalibrate(self, spectrometer)
+        self.auto_calibrate = AutoCalibrate(self, spectrometer, spectrometer_frame)
         self.set_unavailable = set_unavailable
         self.set_available = set_available
         
@@ -101,6 +103,7 @@ class MyRotationMount():
             print("No associated spectrometer")
             return
         
+        self.corrected_angle = 0
         self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
         thread.start()
@@ -115,6 +118,7 @@ class MyRotationMount():
         
     def get_corrected_angle(self, angle):
         """Calculate the corrected angle based on calibration adjustments."""
+        
         return (angle - self.corrected_angle) % 360
 
     def __repr__(self):

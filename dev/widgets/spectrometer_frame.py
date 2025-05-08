@@ -369,7 +369,7 @@ class SpectrometerFrame(CTkFrame):
                 
                 self.single_save(file_path, wavelengths, intensities, single_save, reference, i)
         
-        #Used for Advanced Save
+        #Used for Advanced Save (Never)
         else:
             self.single_save(file_path, wavelengths, intensities, single_save, reference, self.split-1)
     
@@ -436,7 +436,7 @@ class SpectrometerFrame(CTkFrame):
                 self.notification(f"Dark reference acquisition time differs from current", color="#e17e00")
 
     
-    def single_save(self, file_path, wavelengths, intensities, single_save, reference, index):    
+    def single_save(self, file_path, wavelengths, intensities, single_save, reference, index, display_notification=True):    
         local_wavelengths, local_intensities = self.connected_spectrometers[index].chart_queue.get()
         wavelengths_to_write = wavelengths if wavelengths is not None else local_wavelengths
         intensities_to_write = intensities if intensities is not None else local_intensities
@@ -461,7 +461,7 @@ class SpectrometerFrame(CTkFrame):
                             writer.writerow(['Wavelength [nm]', ' Relative intensity [%]'])
                             writer.writerow(['>>>>>Begin Spectral Data<<<<<'])
                             writer.writerows(zip(wavelengths_to_write, intensities_to_write))
-                    if single_save:
+                    if single_save and display_notification:
                         self.notification(f"Successfully saved as", file_path, "#1a8300", path=file_path)
                         print(f"Data saved successfully to {file_path}")
                 except Exception as e:
@@ -905,7 +905,7 @@ class SpectrometerFrame(CTkFrame):
         )
         label.pack(padx=20, pady=20)
         
-        print(f"Is Unavailable: {message}")
+        print(f"Is Unavailable Reason: {message}")
         
     def set_available(self):
         if self.unavailable_message:
@@ -925,7 +925,7 @@ class SpectrometerFrame(CTkFrame):
         self.pause_button.configure(state=state)
         self.play_button.configure(state=state)
         self.save_button.configure(state=state)
-        self.adv_save_button.configure(state=state)
+        #self.adv_save_button.configure(state=state)
         self.reflectance_data_button.configure(state=state)
         self.raw_data_button.configure(state=state)
         self.new_experiment_button.configure(state=state)

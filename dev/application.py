@@ -84,6 +84,7 @@ class MyApp(CTk):
         except:
             debugp("","")
         
+        #Auto connect via connected camera serial
         self.autoConnect()
 
 
@@ -182,7 +183,7 @@ class MyApp(CTk):
             if not spectrometer:
                 continue
             
-            rotation_mount.setup_auto_calibration(spectrometer, partial(self.spectrometer_frame.set_unavailable,"Autocalibrating..."), self.spectrometer_frame.set_available)
+            rotation_mount.setup_auto_calibration(spectrometer, self.spectrometer_frame, partial(self.spectrometer_frame.set_unavailable,"Autocalibrating..."), self.spectrometer_frame.set_available)
             self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
 
         
@@ -320,7 +321,6 @@ class MyApp(CTk):
         """
         for device in microscope.devices:
             if isinstance(device, device_type):
-                print(device)
                 return device
         return None
     
@@ -366,7 +366,6 @@ class MyApp(CTk):
         """
         for device in microscope.devices:
             if device.serial == serial:
-                print(device)
                 return device
         return None
     

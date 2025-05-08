@@ -110,6 +110,7 @@ class MySpectrometer():
             time.sleep(0.2)
             self.spectrometer.close()
             self.connected = False
+            print(f"{self.name} disconnected.")
 
 
     def set_integration_time(self, time_microseconds):
