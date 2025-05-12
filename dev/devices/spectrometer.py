@@ -51,6 +51,14 @@ class MySpectrometer():
         try:
             self.spectrometer = Spectrometer.from_serial_number(self.serial)
             self.connected = True
+            
+            try:
+                # Check if TEC is enabled (Power Supply)
+                tec_status = self.spectrometer.f.tec.tec_get_enable()
+                print("TEC Enabled:", tec_status)
+            except:
+                debugp("TEC", "Tec not working")
+                
         except Exception as e:
             pass
         return self.connected
@@ -108,7 +116,7 @@ class MySpectrometer():
         if self.connected:
             self.stop()
             time.sleep(0.2)
-            self.spectrometer.close()
+            self.spectrometer.close() #Maybe we shouldn't use .close() ?
             self.connected = False
             print(f"{self.name} disconnected.")
 

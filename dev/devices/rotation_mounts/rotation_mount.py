@@ -15,7 +15,7 @@ class MyRotationMount():
         name : `str`
             Visible name of this device in the graphical interface.
         serial : `str`
-            The unique device serial number enabling communication.
+            The unique device serial number enabling communication check the windows device manager to find corresponding COM ports .
         associated_spectrometer : optional
             A spectrometer that may be linked to this device to allow auto calibration.
         enable : `bool`, optional

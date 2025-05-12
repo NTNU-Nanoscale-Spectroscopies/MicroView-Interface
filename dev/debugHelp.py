@@ -6,7 +6,7 @@ match_id = []
 # match_id.append("connecting")
 # match_id.append("thread")
 # match_id.append("spec")
-match_id.append("autocalib")
+match_id.append("tec")
 
 def debugp(id, text):
     """

@@ -52,7 +52,7 @@ class FileSystem():
                 if match:
                     max_number = max(max_number, int(match.group(1)))
         except FileNotFoundError:
-            print(f"Error: The path '{path}' does not exist.")
+            pass
         
         return max_number + 1
         
