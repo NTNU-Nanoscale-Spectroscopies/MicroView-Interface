@@ -85,7 +85,7 @@ class MyApp(CTk):
             debugp("","")
         
         #Auto connect via connected camera serial
-        self.autoConnect()
+        #self.autoConnect()
 
 
     def swicth_theme_mode(self):

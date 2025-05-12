@@ -73,39 +73,7 @@ class AutoCalibrate():
             
             self.spectrometer_frame.single_save(file_path, wavelengths, intensities, True, False, self.spectrometer_frame.split -1, False)
        
-        # wave_length = 650
-        
-        # angle_intensity = np.zeros((360, 2))
-
-        # self.rotation_mount.home()
-        # time.sleep(0.2)
-        
-        # for angle in range(360):
-            
-        #     self.rotation_mount.set_absolute_angle(angle)
-        #     time.sleep(self.spectrometer.integration_time + 0.2)
-
-        #     wavelengths, intensities = self.spectrometer.chart_queue.get()
-
-        #     wave_length_index = np.where(wavelengths >= wave_length)[0][0]
-
-        #     intensity = intensities[wave_length_index]
-        #     angle_intensity[angle] = [angle, intensity]  
-
-        #     max_idx = np.argmax(angle_intensity[:, 1])
-        #     min_idx = np.argmin(angle_intensity[:, 1])
-
-        # max_angle, max_intensity = angle_intensity[max_idx]
-        # min_angle, min_intensity = angle_intensity[min_idx]
-
-        # #plot_data(angle_intensity)
-
-        # self.zero_angle = max_angle
-        # self.ninety_angle = min_angle
-        
-        # debugp("Autocalib", f"Max Intensity: {max_intensity} at Angle: {max_angle}")
-        # debugp("Autocalib", f"Min Intensity: {min_intensity} at Angle: {min_angle}")
-        
+    
     def get_zero_angle(self):
         """Returns the angle corresponding to maximum intensity (zero-degree angle).
         """

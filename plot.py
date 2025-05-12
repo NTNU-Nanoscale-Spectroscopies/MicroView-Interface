@@ -54,4 +54,4 @@ def plot_3d_spectra(folder_path, wavelength_min=None, wavelength_max=None):
 
 
 # Example usage:
-#plot_3d_spectra(r"C:\Users\olive\OneDrive\Documents\Data\Default\2025-05-08\Experiment_8\Calibration", 500, 550)
+#plot_3d_spectra(r"C:\Users\A068\Documents\Data\Default\2025-05-12\Experiment_6\Calibration", 347, 932)

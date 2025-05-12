@@ -1,3 +1,16 @@
+v2.1.7
+
+    Added :
+        Automatic calibration
+        Calibration data is saved in the current experiment folder
+        Light,dark references are automatically saved 
+
+    Removed :
+        Advanced save
+
+    Bugs : 
+        Random crash hasn't been fixed
+
 v2.0.6
 
     Added :
