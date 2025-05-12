@@ -184,7 +184,9 @@ class MyApp(CTk):
                 continue
             
             rotation_mount.setup_auto_calibration(spectrometer, self.spectrometer_frame, partial(self.spectrometer_frame.set_unavailable,"Autocalibrating..."), self.spectrometer_frame.set_available)
-            self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
+            
+            #Can't find why this line creates a deiconify bug :\
+            #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
 
         
         self.is_menu = False

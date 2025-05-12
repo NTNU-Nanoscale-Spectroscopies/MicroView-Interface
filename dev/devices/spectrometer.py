@@ -54,10 +54,11 @@ class MySpectrometer():
             
             try:
                 # Check if TEC is enabled (Power Supply)
-                tec_status = self.spectrometer.f.tec.tec_get_enable()
-                print("TEC Enabled:", tec_status)
-            except:
-                debugp("TEC", "Tec not working")
+                tec_status = self.spectrometer.f.thermo_electric.enable_tec(True)
+                tec_temp = self.spectrometer.f.thermo_electric.read_temperature_degrees_celsius()
+                print("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
+            except Exception as e:
+                debugp("TEC", f"Tec not working : {e}")
                 
         except Exception as e:
             pass
