@@ -111,7 +111,7 @@ class FileSystem():
         
         return f"{file_path}{file_name}"
     
-    def get_calibration_directory(self, integration_time="", name=None):
+    def get_calibration_directory(self, name=None):
         """Provides the full path to the calibration data backup location
 
         Notes
@@ -137,11 +137,36 @@ class FileSystem():
         folder_name = name or "Calibration"
         file_path = os.path.expanduser(f"{self.backup_directory}\\{folder_name}\\")
         if not os.path.exists(file_path): os.makedirs(file_path)
+        
+        return f"{file_path}"
+    
+    def get_calibration_file_name(self, integration_time="", name=None):
+        """Provides the full path to the calibration data backup location
+
+        Notes
+        ----------
+        `#` is a placeholder for an index, 
+        `@` is a placeholder for a time, 
+        `__` is a placeholder to simplify the file name
+
+        Parameters
+        ----------
+        spectro_name : `str`
+            Spectrometer's name
+        integration_time : `str`
+            Spectrometer's integration time in microseconds
+        name : `str`, optional
+            Will be the name of the saved file
+
+        Returns
+        ---------
+        get_calibration_directory : `str`
+            Path to the calibration data backup location
+        """
+
         file_name = f"Polarizer_£_#__$__@_{integration_time/1000}ms.txt"
         
-        return f"{file_path}{file_name}"
-    
-
+        return f"{file_name}"
        
     def get_max_spectrum_number(self):
         """Finds the next available index Spectrum folder to avoid duplicate files

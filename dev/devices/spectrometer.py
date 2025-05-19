@@ -51,14 +51,6 @@ class MySpectrometer():
         try:
             self.spectrometer = Spectrometer.from_serial_number(self.serial)
             self.connected = True
-            
-            try:
-                # Check if TEC is enabled (Power Supply)
-                tec_status = self.spectrometer.f.thermo_electric.enable_tec(True)
-                tec_temp = self.spectrometer.f.thermo_electric.read_temperature_degrees_celsius()
-                print("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
-            except Exception as e:
-                debugp("TEC", f"Tec not working : {e}")
                 
         except Exception as e:
             pass
@@ -134,6 +126,16 @@ class MySpectrometer():
             self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
 
+    def get_temperature(self):
+        try:
+            # Check if TEC is enabled (Power Supply)
+            tec_status = self.spectrometer.f.thermo_electric.enable_tec(True)
+            tec_temp = self.spectrometer.f.thermo_electric.read_temperature_degrees_celsius()
+            debugp("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
+            return tec_temp
+        except Exception as e:
+            debugp("TEC", f"Tec not working : {e}")
+        return
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

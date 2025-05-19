@@ -30,7 +30,7 @@ class SpectrometerFrame(CTkFrame):
         super().__init__(master)
         
         self.is_disabled = False
-        
+        self.unavailable_message_label = None
         
         
         self.file_system = master.file_system
@@ -79,6 +79,10 @@ class SpectrometerFrame(CTkFrame):
         self.dark_reference_wavelengths, self.dark_reference_intensities = [], []
      
         self.split = 1
+        
+        self.temperature_display = None
+        
+        self.update_temperature()
     
     def connect(self, device):
         """Try connecting the spectrometers. 
@@ -131,20 +135,25 @@ class SpectrometerFrame(CTkFrame):
             self.toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
             self.toolbar.update()
    
+            self.temperature_display = CTkLabel(self, text="∅°c", width=40, height=40, fg_color="transparent")
+            self.temperature_display.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+            CTkToolTip(self.temperature_display, delay=0.2, message="Active spectrometer temperature") 
+            
+            
             self.fullscreen_button = CTkButton(self, text="", width=40, height=40, image=img_full_screen, fg_color="transparent", command=self.extend)
-            self.fullscreen_button.grid(row=0, column=2, padx=5, pady=5, sticky="ne")
+            self.fullscreen_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
             CTkToolTip(self.fullscreen_button, delay=0.2, message="Full Screen") 
 
             self.import_button = CTkButton(self, text="", width=40, height=40, image=img_plus, fg_color="transparent", command=self.import_chart)
-            self.import_button.grid(row=1, column=2, padx=5, pady=5, sticky="ne")
+            self.import_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
             CTkToolTip(self.import_button, delay=0.2, message="Import Chart") 
 
             self.light_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_on, fg_color="transparent", command=self.set_light_reference)
-            self.light_reference_button.grid(row=2, column=2, padx=5, pady=5, sticky="ne")
+            self.light_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
             CTkToolTip(self.light_reference_button, delay=0.2, message="Set Light Reference") 
 
             self.dark_reference_button = CTkButton(self, text="", width=40, height=40, image=img_bulb_off, fg_color="transparent", command=self.set_dark_reference)
-            self.dark_reference_button.grid(row=3, column=2, padx=5, pady=5, sticky="ne")
+            self.dark_reference_button.grid(row=4, column=2, padx=5, pady=5, sticky="ne")
             CTkToolTip(self.dark_reference_button, delay=0.2, message="Set Dark Reference") 
 
             self.pause_button = CTkButton(self, text="", width=40, height=40, image=img_pause, fg_color="transparent", command=self.stop_spectrometer)
@@ -885,32 +894,35 @@ class SpectrometerFrame(CTkFrame):
         self.is_disabled = True
         self.toggle_features("disabled")
 
-        # Create a rounded rectangle frame
-        self.unavailable_message = CTkFrame(
-            self, 
-            corner_radius=0, 
-            bg_color="transparent",
-            width=300,  # Adjust width to fit text + padding
-            height=150  # Adjust height to fit text + padding
-        )  
-        self.unavailable_message.place(relx=0.5, rely=0.5, anchor="center")  
+        if self.unavailable_message_label:
+            self.unavailable_message_label.configure(text=message)
+        else:
+            # Create a rounded rectangle frame
+            self.unavailable_message = CTkFrame(
+                self, 
+                corner_radius=0, 
+                bg_color="transparent",
+                width=300,  # Adjust width to fit text + padding
+                height=150  # Adjust height to fit text + padding
+            )  
+            self.unavailable_message.place(relx=0.5, rely=0.5, anchor="center")  
 
-        # Create a label inside the frame
-        label = CTkLabel(
-            self.unavailable_message, 
-            text=message, 
-            font=("Arial", 34), 
-            bg_color="transparent",
-            fg_color="transparent"
-        )
-        label.pack(padx=20, pady=20)
+            # Create a label inside the frame
+            self.unavailable_message_label = CTkLabel(
+                self.unavailable_message, 
+                text=message, 
+                font=("Arial", 34), 
+                bg_color="transparent",
+                fg_color="transparent"
+            )
+            self.unavailable_message_label.pack(padx=20, pady=20)
         
-        print(f"Is Unavailable Reason: {message}")
         
     def set_available(self):
         if self.unavailable_message:
             self.is_disabled = False
             self.unavailable_message.destroy()
+            self.unavailable_message_label = None
             self.toggle_features("normal")
             print("Set enabled")
             
@@ -930,3 +942,13 @@ class SpectrometerFrame(CTkFrame):
         self.raw_data_button.configure(state=state)
         self.new_experiment_button.configure(state=state)
     
+    def update_temperature(self):
+        
+        if self.temperature_display:
+            temp = "∅"
+            if len(self.connected_spectrometers) != 0:
+                temp = self.connected_spectrometers[self.split-1].get_temperature()
+                
+            self.temperature_display.configure(text=f"{temp}°c")
+        
+        self.after(1000, self.update_temperature)

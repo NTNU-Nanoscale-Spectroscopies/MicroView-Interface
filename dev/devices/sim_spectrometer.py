@@ -1,9 +1,11 @@
 
 import queue
+import random
 import threading
 import time
 
 import numpy as np
+from dev.debugHelp import debugp
 from dev.devices.spectrometer import MySpectrometer
 
 
@@ -43,7 +45,7 @@ class MySimSpectrometer(MySpectrometer):
                 self.index = 0
                 while self.is_running:
                     
-                    wavelengths, intensities = self.simulate_spectrum_sin()
+                    wavelengths, intensities = self.simulate_spectrum()
                    
                     # Place data in the chart queue
                     if not self.chart_queue.empty():
@@ -171,6 +173,12 @@ class MySimSpectrometer(MySpectrometer):
         if self.connected:
             #self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
+
+    def get_temperature(self):
+        if self.name == "Spectrometer-VIS":
+            return round(random.uniform(5,9), 2)
+        else:
+            return round(random.uniform(0,4), 2)
 
     def __repr__(self):
         """Override __repr__ method"""

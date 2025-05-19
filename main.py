@@ -80,7 +80,7 @@ from dev.devices.sim_spectrometer import MySimSpectrometer
 
 
 # Define the application version
-version = "V2.1.8"
+version = "V2.1.9"
 
 # Set the size of the application's main window (width, height)
 size = (1200,700)
@@ -89,15 +89,15 @@ size = (1200,700)
 visible_notif_time = 3
 
 # Specify the directory where data backups will be saved
-backup_directory = r"C:\Users\A068\Documents\Data\Default"
-#backup_directory = r"C:\Users\olive\OneDrive\Documents\Data\Default"
+#backup_directory = r"C:\Users\A068\Documents\Data\Default"
+backup_directory = r"C:\Users\olive\OneDrive\Documents\Data\Default"
 
 # Create an instance of a microscope setup
 gm_microscope = MyMicroscope("Maria Goeppert Mayer",
-    MyCamera("Camera", "28939", enable=True),
-    MySpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
-    MySpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
-    MyRotationMount("White-Light-Plzr", "COM6", "QEP06226", enable=False),
+    MySimCamera("Camera", "28939", enable=True),
+    MySimSpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
+    MySimSpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
+    MySimRotationMount("White-Light-Plzr", "COM6", "QEP06226", enable=False),
     MyRotationMount("Laser-Plzr", "COM7", "QEP06226", enable=False),
     MyShutter("White light - shutter", "26006167", enable=True, model="KST201"),
     MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),

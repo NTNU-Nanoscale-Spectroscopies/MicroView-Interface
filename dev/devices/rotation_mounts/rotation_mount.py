@@ -1,6 +1,7 @@
 import threading
+from tkinter import Toplevel
 import elliptec
-
+from CTkToolTip import *
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
 
 
@@ -107,11 +108,11 @@ class MyRotationMount():
         self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
         thread.start()
-        self.set_unavailable()
+        self.set_unavailable("Autocalibrating...")
         
     def threaded_auto_calibration(self):
         """Execute the auto-calibration routine in a separate thread."""
-        self.auto_calibrate.start()
+        self.auto_calibrate.start(self.set_unavailable)
         self.set_available()
         self.corrected_angle = self.auto_calibrate.get_zero_angle()
         self.spectrometer.acquire_save_data = 0
@@ -121,5 +122,9 @@ class MyRotationMount():
         
         return (angle - self.corrected_angle) % 360
 
+    def set_settings(self, folder_name, wavelength):
+        self.auto_calibrate.set_settings(folder_name, wavelength)
+
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
+    

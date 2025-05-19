@@ -1,3 +1,4 @@
+from tkinter import messagebox
 from CTkToolTip import *
 from dev.debugHelp import debugp
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
@@ -75,18 +76,22 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MyRotationMount):
                 entry = CTkEntry(frame, width=50, placeholder_text="0")
                 home_btn = CTkButton(frame, text="🏠", width=30, state="disabled",     command=lambda d=device, e=entry: (e.delete(0, "end"), e.insert(0, "0"), d.home()))
-                CTkToolTip(home_btn, delay=0.2, message="Home") 
+                CTkToolTip(home_btn, delay=0.2, message="Rotation Mount Home") 
                 auto_calibration_btn = CTkButton(frame, image=img_auto_calibration, width=30, text=None, state="disabled",     command=device.start_auto_calibration)
                 CTkToolTip(auto_calibration_btn, delay=0.2, message="Auto Calibrate") 
                 label = CTkLabel(frame, text="°")
                 button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_angle_entry(d,e))
+                settings = CTkButton(frame, text="⁞", width=1, state="disabled", command=lambda d=device : self.open_rotation_mount_settings(d))
+                CTkToolTip(settings, delay=0.2, message="Settings") 
 
-                home_btn.pack(side="left", padx=(10,5))
-                button.pack(side="left", padx=(10,5))
+                settings.pack(side="left", padx=(0,0))
+                home_btn.pack(side="left", padx=(5,5))
+                button.pack(side="left", padx=(5,5))
                 entry.pack(side="left")
                 label.pack(side="left", padx=3)
                 auto_calibration_btn.pack(side="left", padx=(10,5))
                 entry.configure(state="disabled")
+                widgets.append((settings,""))
                 widgets.append((button,""))
                 widgets.append((entry,""))
                 widgets.append((home_btn,""))
@@ -303,7 +308,49 @@ class QuickSetupFrame(CTkScrollableFrame):
             Sub-content used to display the path of the last saved file. None by default
         """
         self.master.master.master.notification(head_message, message, color)
+     
+    def open_rotation_mount_settings(self, device):
+        
+        self.popup = CTkToplevel(self)
+        self.popup.title("Rotation Mount Settings")
+        self.popup.geometry("320x230")
+        self.popup.resizable(True, True)
 
+        # Text input
+        self.label1 = CTkLabel(self.popup, text="Calibration folder name :")
+        self.label1.pack(pady=(15, 5))
+        self.text_entry = CTkEntry(self.popup, width=220, placeholder_text="Calibration")
+        self.text_entry.pack()
+
+        # Numeric input
+        self.label2 = CTkLabel(self.popup, text="Wavelength to calibrate on :")
+        self.label2.pack(pady=(10, 5))
+        self.num_entry = CTkEntry(self.popup, width=220, placeholder_text="650")
+        self.num_entry.pack()
+
+        # Button Frame
+        button_frame = CTkFrame(self.popup)
+        button_frame.pack(pady=20)
+
+        self.save_btn = CTkButton(button_frame, text="Save", command=lambda d=device : self.rotation_mount_save(d))
+        self.save_btn.grid(row=0, column=0, padx=10)
+
+        self.cancel_btn = CTkButton(button_frame, text="Cancel", command=self.popup.destroy)
+        self.cancel_btn.grid(row=0, column=1, padx=10)
+        
+        self.popup.transient(self)
+
+    def rotation_mount_save(self, device):
+        folder_name = self.text_entry.get()
+        try:
+            wavelength = float(self.num_entry.get())
+        except ValueError:
+            messagebox.showerror("Invalid Input", "Please enter a valid number.")
+            return
+
+        print(wavelength)
+        device.set_settings(wavelength, folder_name)
+        self.popup.destroy()
 
 
 class DeviceEntry:

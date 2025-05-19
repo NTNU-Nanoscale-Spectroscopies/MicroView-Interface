@@ -53,5 +53,116 @@ def plot_3d_spectra(folder_path, wavelength_min=None, wavelength_max=None):
     plt.show()
 
 
-# Example usage:
-#plot_3d_spectra(r"C:\Users\A068\Documents\Data\Default\2025-05-12\Experiment_6\Calibration", 347, 932)
+
+
+
+
+
+def extract_intensity_at_650nm(filepath, target_wavelength=650.0, tolerance=1.0):
+    with open(filepath, 'r') as file:
+        lines = file.readlines()
+
+    # Find where spectral data starts
+    start_index = None
+    for i, line in enumerate(lines):
+        if '>>>>>Begin Spectral Data<<<<<' in line:
+            start_index = i + 1
+            break
+
+    if start_index is None:
+        return None
+
+    closest_diff = float('inf')
+    closest_intensity = None
+
+    for line in lines[start_index:]:
+        try:
+            wavelength, intensity = map(float, line.strip().split(','))
+            diff = abs(wavelength - target_wavelength)
+            if diff < closest_diff and diff <= tolerance:
+                closest_diff = diff
+                closest_intensity = intensity
+        except:
+            continue
+
+    return closest_intensity
+
+def plot_intensity_curve(folder_path):
+    files = sorted([f for f in os.listdir(folder_path) if f.endswith('.txt') or f.endswith('.csv')])
+    intensities = []
+    labels = []
+
+    for file in files:
+        path = os.path.join(folder_path, file)
+        intensity = extract_intensity_at_650nm(path)
+        if intensity is not None:
+            labels.append(file)
+            intensities.append(intensity)
+        else:
+            print(f"Warning: No valid 650 nm data found in {file}")
+
+    # Plot as connected dots
+    plt.figure(figsize=(12, 6))
+    plt.plot(intensities, marker='o', linestyle='-', color='darkorange')
+    #plt.xticks(ticks=range(len(labels)), labels=labels, rotation=45, ha='right')
+    plt.title('Intensity at ~650 nm Across Files')
+    plt.xlabel('File Index')
+    plt.ylabel('Intensity at ~650 nm')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
+
+def plot_all_intensity_curve(folder_path):
+    
+    experiment_folders = sorted([
+        f for f in os.listdir(folder_path)
+        if os.path.isdir(os.path.join(folder_path, f)) and f.lower().startswith("experiment")
+    ])
+
+    plt.figure(figsize=(12, 6))  # Only one figure for all plots
+
+    for experiment in experiment_folders:
+        calibration_path = os.path.join(folder_path, experiment, "Calibration")
+        if not os.path.isdir(calibration_path):
+            print(f"Calibration folder not found for {experiment}. Skipping.")
+            continue
+
+        files = sorted([
+            f for f in os.listdir(calibration_path)
+            if f.endswith('.txt') or f.endswith('.csv')
+        ])
+
+        intensities = []
+        labels = []
+
+        for file in files:
+            path = os.path.join(calibration_path, file)
+            intensity = extract_intensity_at_650nm(path)
+            if intensity is not None:
+                labels.append(file)
+                intensities.append(intensity)
+            else:
+                print(f"Warning: No valid 650 nm data found in {file}")
+
+        if intensities:
+            plt.plot(intensities, marker='o', linestyle='-', label=experiment)
+
+    # Global plot settings
+    plt.title('Intensity at ~650 nm Across Experiments')
+    plt.xlabel('File Index')
+    plt.ylabel('Intensity at ~650 nm')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+#Plot one folder
+#plot_intensity_curve(r"C:\Users\olive\OneDrive\Bureau\2025-05-12\Experiment_10\Calibration")
+
+#Plot all folders
+#plot_all_intensity_curve(r"C:\Users\olive\OneDrive\Bureau\2025-05-12")
+
+#Plot on folder in 3D
+#plot_3d_spectra(r"C:\Users\olive\OneDrive\Bureau\2025-05-12\Experiment_10\Calibration", 649, 651)

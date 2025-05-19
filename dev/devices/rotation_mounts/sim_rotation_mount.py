@@ -101,11 +101,11 @@ class MySimRotationMount(MyRotationMount):
         self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=self.threaded_auto_calibration, daemon=True)
         thread.start()
-        self.set_unavailable()
+        self.set_unavailable("Autocalibrating...")
         
     def threaded_auto_calibration(self):
         """Execute the auto-calibration routine in a separate thread."""
-        self.auto_calibrate.start()
+        self.auto_calibrate.start(self.set_unavailable)
         self.set_available()
         self.corrected_angle = self.auto_calibrate.get_zero_angle()
         self.auto_calibrate.get_ninety_angle()
