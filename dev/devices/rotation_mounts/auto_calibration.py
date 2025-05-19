@@ -118,7 +118,10 @@ class AutoCalibrate():
         debugp("Autocalib", f"Min Intensity: {min_intensity} at Angle: {min_angle}")
 
         self.save_data(all_data, calibration_folder, date)
+        
+        #Plot recorded data
         self.plot_data(angle_intensity, calibration_folder, date, self.calibration_wavelength)
+        
         self.plot_all(calibration_folder, date, self.calibration_wavelength)
         
     def moving_average(self, values, window=3):

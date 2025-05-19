@@ -27,9 +27,13 @@ class MySimSpectrometer(MySpectrometer):
 
     def connect(self):
         """Override connect method"""        
-        self.connected = True
+        self.connected = False
         self.is_running = False
         
+        temp = self.get_temperature()
+        if temp != None and temp < 0 :
+            self.connected = True
+            
         return self.connected
 
     def start(self):
@@ -176,9 +180,9 @@ class MySimSpectrometer(MySpectrometer):
 
     def get_temperature(self):
         if self.name == "Spectrometer-VIS":
-            return round(random.uniform(5,9), 2)
+            return round(random.uniform(-5,-1), 2)
         else:
-            return round(random.uniform(0,4), 2)
+            return round(random.uniform(-10,-4), 2)
 
     def __repr__(self):
         """Override __repr__ method"""

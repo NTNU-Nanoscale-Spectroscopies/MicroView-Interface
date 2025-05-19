@@ -310,42 +310,62 @@ class QuickSetupFrame(CTkScrollableFrame):
         self.master.master.master.notification(head_message, message, color)
      
     def open_rotation_mount_settings(self, device):
-        
         self.popup = CTkToplevel(self)
         self.popup.title("Rotation Mount Settings")
-        self.popup.geometry("320x230")
+        self.popup.geometry("330x330")  # Increased height to accommodate new elements
         self.popup.resizable(True, True)
 
-        # Text input
-        self.label1 = CTkLabel(self.popup, text="Calibration folder name :")
+        # Degrees input
+        self.label3 = CTkLabel(self.popup, text="Step Angle (°):")
+        self.label3.pack(pady=(10, 5))
+        self.degree_entry = CTkEntry(self.popup, width=220, placeholder_text="1")
+        self.degree_entry.pack()
+
+        # Run Sweep Button
+        self.sweep_btn = CTkButton(self.popup, text="Run Sweep", command=lambda d=device: self.begin_sweep(d))
+        self.sweep_btn.pack(pady=(5, 10))
+
+        # Calibration folder input
+        self.label1 = CTkLabel(self.popup, text="Calibration folder name:")
         self.label1.pack(pady=(15, 5))
-        self.text_entry = CTkEntry(self.popup, width=220, placeholder_text="Calibration")
+        self.text_entry = CTkEntry(self.popup, width=220, placeholder_text=device.auto_calibrate.calibration_folder)
         self.text_entry.pack()
 
-        # Numeric input
-        self.label2 = CTkLabel(self.popup, text="Wavelength to calibrate on :")
+        # Wavelength input
+        self.label2 = CTkLabel(self.popup, text="Wavelength to calibrate on:")
         self.label2.pack(pady=(10, 5))
-        self.num_entry = CTkEntry(self.popup, width=220, placeholder_text="650")
+        self.num_entry = CTkEntry(self.popup, width=220, placeholder_text=device.auto_calibrate.calibration_wavelength)
         self.num_entry.pack()
-
+        
         # Button Frame
         button_frame = CTkFrame(self.popup)
         button_frame.pack(pady=20)
-
-        self.save_btn = CTkButton(button_frame, text="Save", command=lambda d=device : self.rotation_mount_save(d))
+        
+        self.save_btn = CTkButton(button_frame, text="Save", command=lambda d=device: self.rotation_mount_save(d))
         self.save_btn.grid(row=0, column=0, padx=10)
 
         self.cancel_btn = CTkButton(button_frame, text="Cancel", command=self.popup.destroy)
         self.cancel_btn.grid(row=0, column=1, padx=10)
-        
+
         self.popup.transient(self)
+
+    def begin_sweep(self, device):
+        # Placeholder function for sweep logic        
+        try:
+            degree_value = int(self.degree_entry.get())
+            device.start_sweep(degree_value)
+            self.popup.destroy()
+        except ValueError:
+            messagebox.showerror("Invalid Step Angle", "Please enter a valid number.")
+            return
+        
 
     def rotation_mount_save(self, device):
         folder_name = self.text_entry.get()
         try:
             wavelength = float(self.num_entry.get())
         except ValueError:
-            messagebox.showerror("Invalid Input", "Please enter a valid number.")
+            messagebox.showerror("Invalid Wavelength", "Please enter a valid number.")
             return
 
         print(wavelength)

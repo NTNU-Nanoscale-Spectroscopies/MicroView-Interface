@@ -1,7 +1,10 @@
+from datetime import *
 import threading
+import time
 from tkinter import Toplevel
 import elliptec
 from CTkToolTip import *
+import numpy as np
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
 
 
@@ -35,6 +38,7 @@ class MyRotationMount():
         self.is_auto_calibrate = False
         self.auto_calibrate = None
         self.corrected_angle = 0
+        self.sweep_folder_name = "Sweep"
         
 
     def connect(self):
@@ -124,6 +128,37 @@ class MyRotationMount():
 
     def set_settings(self, folder_name, wavelength):
         self.auto_calibrate.set_settings(folder_name, wavelength)
+            
+    def start_sweep(self, step_angle, sweep_folder=None):
+        self.spectrometer.acquire_save_data = 1
+        thread = threading.Thread(target=lambda: self.start_threaded_sweep(step_angle, sweep_folder), daemon=True)
+        thread.start()
+        self.set_unavailable(f"Sweeping...")        
+        
+    def start_threaded_sweep(self, step_angle, sweep_folder=None):
+
+        if sweep_folder != None:
+            self.sweep_folder_name = sweep_folder
+        
+        for angle in range(0, 360, step_angle):
+            print(angle)
+            real_angle = angle % 360
+            self.set_absolute_angle(real_angle)
+            time.sleep((self.spectrometer.integration_time / 1_000_000) + 0.5)
+            wavelengths, intensities = self.spectrometer.chart_queue.get()
+            
+            self.set_unavailable(f"Measuring {int(angle/step_angle)}/{round(360/step_angle)}\nAngle :{angle}°")
+            
+            file_path = self.spectrometer_frame.file_system.get_spectrometer_directory(self.spectrometer.integration_time, self.spectrometer.name, self.sweep_folder_name)
+            file_path = file_path.replace("#", f"{int(angle/step_angle)}_{angle}deg_").replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.spectrometer.name.split("-")[-1])
+
+            self.spectrometer_frame.single_save(
+                f"{file_path}", wavelengths, intensities,
+                True, False, self.spectrometer_frame.split - 1, False
+            )
+            print(f"Saved to {file_path}")
+
+        self.set_available()
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

@@ -50,8 +50,11 @@ class MySpectrometer():
         self.is_running = False
         try:
             self.spectrometer = Spectrometer.from_serial_number(self.serial)
-            self.connected = True
-                
+            
+            temp = self.get_temperature()
+            if temp != None and temp < 0 :
+                self.connected = True
+            
         except Exception as e:
             pass
         return self.connected

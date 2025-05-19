@@ -1,9 +1,9 @@
 import threading
-
+from datetime import *
 from dev.debugHelp import debugp
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
-
+import time
 
 class MySimRotationMount(MyRotationMount):
     """Class for creating an object that communicates with and controls a stage-type device"""
@@ -35,6 +35,7 @@ class MySimRotationMount(MyRotationMount):
         self.is_auto_calibrate = False
         self.auto_calibrate = None
         self.corrected_angle = 0
+        self.sweep_folder_name = "Sweep"
         
     def connect(self):
         """
@@ -114,6 +115,8 @@ class MySimRotationMount(MyRotationMount):
     def get_corrected_angle(self, angle):
         """Calculate the corrected angle based on calibration adjustments."""
         return (angle - self.corrected_angle) % 360
+    
+    
         
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
