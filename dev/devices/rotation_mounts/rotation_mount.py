@@ -140,6 +140,7 @@ class MyRotationMount():
         if sweep_folder != None:
             self.sweep_folder_name = sweep_folder
         
+        date = f"{datetime.now():%H.%M.%S}"
         for angle in range(0, 360, step_angle):
             print(angle)
             real_angle = angle % 360
@@ -150,7 +151,7 @@ class MyRotationMount():
             self.set_unavailable(f"Measuring {int(angle/step_angle)}/{round(360/step_angle)}\nAngle :{angle}°")
             
             file_path = self.spectrometer_frame.file_system.get_spectrometer_directory(self.spectrometer.integration_time, self.spectrometer.name, self.sweep_folder_name)
-            file_path = file_path.replace("#", f"{int(angle/step_angle)}_{angle}deg_").replace("@", f"{datetime.now():%H.%M.%S}").replace("$", self.spectrometer.name.split("-")[-1])
+            file_path = file_path.replace("#", f"{int(angle/step_angle)}_{angle}deg_").replace("@", date).replace("$", self.spectrometer.name.split("-")[-1])
 
             self.spectrometer_frame.single_save(
                 f"{file_path}", wavelengths, intensities,
