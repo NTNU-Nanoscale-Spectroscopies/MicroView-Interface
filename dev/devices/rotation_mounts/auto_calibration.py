@@ -9,6 +9,7 @@ import numpy as np
 from dev.debugHelp import debugp
 
 import matplotlib
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 
 class AutoCalibrate():
@@ -28,7 +29,7 @@ class AutoCalibrate():
         self.ninety_angle = None
         self.calibration_wavelength = 650
         self.calibration_folder = "Calibration"
-        self.saved_integration_time = (self.spectrometer.integration_time/1000)/1000
+        self.saved_integration_time = (self.spectrometer.integration_time)
         
         
         self.angle1, self.inten1 = None, None
@@ -68,7 +69,7 @@ class AutoCalibrate():
             return results
 
         if overide_integration_time:
-            self.spectrometer.set_integration_time(300)
+            self.spectrometer.set_integration_time(300000)
 
         angle_intensity = np.full((360, 2), np.nan)
         date = f"{datetime.now():%H.%M.%S}"
@@ -76,36 +77,58 @@ class AutoCalibrate():
 
         angles, intensities = angle_intensity[:, 0], angle_intensity[:, 1]
         self.angles1, self.inten1 = angles, intensities
-        self.plot_data(angle_intensity, calibration_folder, "raw_10_degs", self.calibration_wavelength)
+        #self.plot_data(angle_intensity, calibration_folder, "raw_10_degs", self.calibration_wavelength)
+
+        max_angle = self.get_max_angle(angles, intensities)
+        print(f"Max angle orig: {max_angle}")
+
 
         sorted_indices = np.argsort(angles)
         angles, intensities = angles[sorted_indices], intensities[sorted_indices]
         smoothed = self.moving_average(intensities, window=5)
         self.angles2, self.inten2 = angles, smoothed
-        self.plot_both(angles, smoothed, calibration_folder, "smoothed_10_degs", self.calibration_wavelength)
+        #self.plot_both(angles, smoothed, calibration_folder, "smoothed_10_degs", self.calibration_wavelength)
 
-        max_index = np.argmax(smoothed)
-        max_angle = angles[max_index]
+        max_angle = self.get_max_angle(angles, intensities)
+        print(f"Max angle smoothed: {max_angle}")
+
         padding_angle = 20
         starting_angle = (max_angle - padding_angle) % 360
-        
+
         debugp("AutoCalibration", f"Max angle :{max_angle}, Starting angle :{starting_angle}")
 
-        if overide_integration_time:
-            self.spectrometer.set_integration_time(500)
-
         all_data += measure_angles(range(int(starting_angle), int(max_angle + padding_angle)), "Second Pass")
+
+        if overide_integration_time:
+            self.spectrometer.set_integration_time(self.saved_integration_time)
 
         angles, intensities = angle_intensity[:, 0], angle_intensity[:, 1]
         self.angles3, self.inten3 = angles, intensities
         sorted_indices = np.argsort(angles)
         angles, intensities = angles[sorted_indices], intensities[sorted_indices]
 
-        self.plot_data(angle_intensity, calibration_folder, "raw_1_deg", self.calibration_wavelength)
+        #self.plot_data(angle_intensity, calibration_folder, "raw_1_deg", self.calibration_wavelength)
         
-        smoothed = self.moving_average(intensities, window=5)
-        self.angles4, self.inten4 = angles, smoothed
-        self.plot_both(angles, smoothed, calibration_folder, "smoothed_1_deg", self.calibration_wavelength)
+        smoothed = self.moving_average(intensities, window=15)
+
+        # Apply mask
+        mask = (angles >= starting_angle) & (angles <= max_angle + padding_angle)
+        angles_subset = angles[mask]
+        smoothed = np.array(smoothed)
+        smoothed_subset = smoothed[mask]
+
+        mask = (angles > starting_angle) & (angles < max_angle + padding_angle)
+
+        # Create a full NaN array of same shape
+        smoothed_subset_full = np.full_like(smoothed, np.nan)
+        # Fill only masked positions with actual values
+        smoothed_subset_full[mask] = smoothed[mask]
+
+        self.angles4, self.inten4 = angles, smoothed_subset_full
+        #self.plot_both(angles_subset, smoothed_subset, calibration_folder, "smoothed_1_deg", self.calibration_wavelength)
+
+        angle_max = angles_subset[np.nanargmax(smoothed_subset)]
+        print(f"Max angle smoothed 1deg: {angle_max}")
 
         max_idx = np.nanargmax(angle_intensity[:, 1])
         min_idx = np.nanargmin(angle_intensity[:, 1])
@@ -114,16 +137,27 @@ class AutoCalibrate():
 
         self.zero_angle, self.ninety_angle = max_angle, min_angle
 
-        debugp("Autocalib", f"Max Intensity: {max_intensity} at Angle: {max_angle}")
-        debugp("Autocalib", f"Min Intensity: {min_intensity} at Angle: {min_angle}")
+        debugp("Autocalibration", f"Max Intensity: {max_intensity} at Angle: {max_angle}")
+        debugp("Autocalibration", f"Min Intensity: {min_intensity} at Angle: {min_angle}")
 
         self.save_data(all_data, calibration_folder, date)
         
         #Plot recorded data
-        self.plot_data(angle_intensity, calibration_folder, date, self.calibration_wavelength)
+        #self.plot_data(angle_intensity, calibration_folder, date, self.calibration_wavelength)
         
         self.plot_all(calibration_folder, date, self.calibration_wavelength)
         
+
+    def get_max_angle(self, angles, intensities):
+        valid_mask = ~np.isnan(intensities) & ~np.isnan(angles)
+        valid_angles = angles[valid_mask]
+        valid_intensities = intensities[valid_mask]
+
+        max_index_raw = np.argmax(valid_intensities)
+        angle_max_raw = valid_angles[max_index_raw]
+
+        return angle_max_raw
+
     def moving_average(self, values, window=3):
         smoothed = []
         for i in range(len(values)):

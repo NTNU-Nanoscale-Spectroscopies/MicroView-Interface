@@ -124,7 +124,7 @@ class MyRotationMount():
     def get_corrected_angle(self, angle):
         """Calculate the corrected angle based on calibration adjustments."""
         
-        return (angle - self.corrected_angle) % 360
+        return (angle + self.corrected_angle) % 360
 
     def set_settings(self, folder_name, wavelength):
         self.auto_calibrate.set_settings(folder_name, wavelength)
@@ -145,7 +145,7 @@ class MyRotationMount():
             print(angle)
             real_angle = angle % 360
             self.set_absolute_angle(real_angle)
-            time.sleep((self.spectrometer.integration_time / 1_000_000) + 0.5)
+            time.sleep((self.spectrometer.integration_time / 1_000_000) + 0.3)
             wavelengths, intensities = self.spectrometer.chart_queue.get()
             
             self.set_unavailable(f"Measuring {int(angle/step_angle)}/{round(360/step_angle)}\nAngle :{angle}°")
@@ -157,9 +157,10 @@ class MyRotationMount():
                 f"{file_path}", wavelengths, intensities,
                 True, False, self.spectrometer_frame.split - 1, False
             )
-            print(f"Saved to {file_path}")
 
         self.set_available()
+        self.spectrometer.acquire_save_data = 0
+
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

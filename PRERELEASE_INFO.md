@@ -1,3 +1,14 @@
+v3.0.0
+
+    Added :
+        Automatic sweep 
+        Automatic calibration routine (First pass every 10degrees > Moving average > Get angle of Max intensity > Second pass every 1 degree around the max > Moving average > Calibrated)
+
+    Removed :
+
+    Bugs : 
+        Random crash hasn't been fixed but never seems to appear...
+
 v2.1.7
 
     Added :

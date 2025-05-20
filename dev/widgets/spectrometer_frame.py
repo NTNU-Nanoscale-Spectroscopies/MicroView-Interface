@@ -949,6 +949,6 @@ class SpectrometerFrame(CTkFrame):
             if len(self.connected_spectrometers) != 0:
                 temp = self.connected_spectrometers[self.split-1].get_temperature()
                 
-            self.temperature_display.configure(text=f"{temp}°c")
+            self.temperature_display.configure(text=f"{round(temp,3)}°c")
         
         self.after(1000, self.update_temperature)
