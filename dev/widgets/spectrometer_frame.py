@@ -320,23 +320,18 @@ class SpectrometerFrame(CTkFrame):
             debugp("spec", "Aborted updating graph")
             return
         
-        if len(self.connected_spectrometers) == 1:
-            spec = self.connected_spectrometers[0]
+        if self.connected_spectrometers:
+           
+            index = 0 if len(self.connected_spectrometers) == 1 else self.split - 1
+            spec = self.connected_spectrometers[index]
+
             if spec.is_running and not spec.chart_queue.empty():
-                self.update_plot(spec, self.plot, 0)  
+                self.update_plot(spec, self.plot, index)
 
                 if spec.chart_queue.empty():
                     self.canvas.draw()
-                    
-        elif len(self.connected_spectrometers) > 1:
-            spec = self.connected_spectrometers[self.split-1]
-            if spec.is_running and not spec.chart_queue.empty():
-                self.update_plot(spec, self.plot, self.split-1)
-            
-                if spec.chart_queue.empty():
-                    self.canvas.draw()
-            
-        self.after(20, lambda : self.update_graph(False))
+
+        self.after(20, lambda: self.update_graph(False))
                 
 
     def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):
