@@ -1,9 +1,15 @@
+from functools import partial
+from tkinter import Canvas, PhotoImage
+from dev.devices.camera.dlls.import_lib import import_thorlab_lib
+from dev.file_system import FileSystem
+from dev.user_profile import UserProfile
 from .widgets.microscope_frame import *
 from .widgets.camera_frame import *
 from .widgets.spectrometer_frame import *
 from .widgets.directory_frame import *
 from .widgets.setup_frame import *
 from .widgets.notification import *
+from .debugHelp import *
 import ctypes
 
 
@@ -40,7 +46,11 @@ class MyApp(CTk):
         self.center_window(size[0], size[1])
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.menu()
+        
+        self.menu()       
+        
+        
+
 
 
     def menu(self):
@@ -49,7 +59,7 @@ class MyApp(CTk):
         self.selected_microscope = None
         for widget in self.winfo_children():
             widget.destroy()
-        self.title(f"MicroView")
+        self.title(f"MicroView - {self.backup_directory}")
         self.grid_columnconfigure(1, weight=0)
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure((0, 1, 3, 4), weight=0)
@@ -68,6 +78,15 @@ class MyApp(CTk):
         self.button = CTkButton(self, text=None, width=50, height=50, image=img_apparence_color_theme, command=self.swicth_theme_mode)
         self.button.grid(row=0, column=0, padx=(0, 20), sticky="e")
         self.update_idletasks()
+        
+        try:
+            module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
+            module.ThorlabsSetup(self)
+        except:
+            debugp("","")
+        
+        #Auto connect via connected camera serial
+        #self.autoConnect()
 
 
     def swicth_theme_mode(self):
@@ -107,6 +126,14 @@ class MyApp(CTk):
         y = int((self.winfo_height()/2) + self.winfo_y() - (height/2))
         self.popup.geometry(f"{width}x{height}+{x}+{y}")
 
+    def autoConnect(self):
+        for m in self.microscopes:
+            for d in m.devices:
+                if isinstance(d, MyCamera) and d.isPluggedIn():
+                    self.go_to_microscope(m)  
+                    return    
+        
+        debugp("AutoConnect", "No Device Detected")              
 
     def go_to_microscope(self, microscope):
         """Displays the microscope config panel
@@ -131,17 +158,41 @@ class MyApp(CTk):
         self.back_button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
         self.settings_button = CTkButton(self, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
         self.settings_button.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="e")
+        
+        self.user_button = CTkButton(self, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
+        self.user_button.grid(row=0, column=1, padx=(0, 65), pady=10, sticky="e")
 
         self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
+        
+        self.file_system = FileSystem(self, self.backup_directory, self.directory_frame)
+
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
-        self.spectrometer_frame = SpectrometerFrame(self, self.find_device_by_type(microscope, MySpectrometer))
+        self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
 
+        for rotation_mount in self.find_devices_by_type(microscope, MyRotationMount):
+                        
+            spectrometer_serial = rotation_mount.associated_spectrometer
+            if not spectrometer_serial:
+                continue
+            
+            spectrometer = self.find_device_by_serial(microscope, spectrometer_serial)
+            if not spectrometer:
+                continue
+            
+            rotation_mount.setup_auto_calibration(spectrometer, self.spectrometer_frame, self.spectrometer_frame.set_unavailable, self.spectrometer_frame.set_available)
+            
+            #Can't find why this line creates a deiconify bug :\
+            #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
+
+        
         self.is_menu = False
+        
+        debugp("connecting", "Check connected devices")
         self.quick_setup_frame.check_connected_devices()
 
 
@@ -173,7 +224,7 @@ class MyApp(CTk):
             frame = CTkFrame(self.popup, fg_color="transparent")
             frame.grid(row=2, column=0, sticky="nsew", columnspan=2)
             CTkLabel(frame, text="Backup directory :").pack(side="left", padx=(40,0))
-            self.backup_name_entry = CTkEntry(frame, placeholder_text=self.backup_directory, textvariable=StringVar(value=self.backup_directory))
+            self.backup_name_entry = CTkEntry(frame, placeholder_text=self.file_system.get_backup_directory(), textvariable=StringVar(value=self.file_system.get_backup_directory()))
             self.backup_name_entry.pack(side="left", fill="x", expand=True, padx=(20,40))
 
             CTkButton(self.popup, text="Cancel", fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.close_popup).grid(row=3, column=0, padx=(40,20), pady=20, sticky="ew")
@@ -181,6 +232,56 @@ class MyApp(CTk):
         
         self.popup.focus_force()
 
+
+    def user_popup(self):
+        """Displays the user popup.
+        Allows users to choose their profile.
+        """
+        if not self.popup:
+            self.popup = CTkToplevel(self)
+            self.popup.title("Profile")
+            self.popup.minsize(405, 200)
+            self.center_popup(600, 300) 
+
+            self.popup.grid_rowconfigure(2, weight=1)
+            self.popup.grid_columnconfigure(0, weight=1)
+
+            self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
+            self.popup.attributes("-topmost", True)
+            self.after(50, lambda: self.popup.attributes("-topmost", False))
+
+            title = CTkLabel(self.popup, text="Choose profile :", font=("Arial", 20))
+            title.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w", columnspan=2)
+
+            input_frame = CTkFrame(self.popup, fg_color="transparent")
+            input_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew", columnspan=2)
+            input_frame.grid_columnconfigure(0, weight=1)
+
+            entry = CTkEntry(input_frame, placeholder_text="Username")
+            entry.grid(row=0, column=0, padx=(0, 5), pady=5, sticky="ew")
+
+            add = CTkButton(input_frame, text="Add", command=lambda: self.selected_user(entry.get()), width=80)
+            add.grid(row=0, column=1, padx=(5, 0), pady=5, sticky="ew")
+
+            scrollable_frame = CTkScrollableFrame(self.popup, fg_color="transparent")
+            scrollable_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew", columnspan=2)
+            
+            scrollable_frame.grid_columnconfigure(0, weight=1)
+            scrollable_frame.grid_columnconfigure(1, weight=1)
+
+            profile_buttons = self.file_system.get_user_names()
+            for i, name in enumerate(profile_buttons):
+                row, col = divmod(i, 2)  # Converts index to (row, column) in a 2-column layout
+                button = UserProfile(scrollable_frame, name, self.close_popup, self.selected_user)
+                button.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
+
+            self.popup.focus_force()
+
+        
+    def selected_user(self, username):
+        """Sets directory path to selected user"""
+        self.file_system.change_user(username)
+        self.close_popup()
 
     def close_popup(self):
         """Closes the settings popup cleanly
@@ -202,12 +303,12 @@ class MyApp(CTk):
             return
 
         self.visible_notif_time = float(self.visible_notif_time_entry.get())
-        self.backup_directory = self.backup_name_entry.get()
+        self.file_system.set_backup_directory(self.backup_name_entry.get())
         self.close_popup()
         
 
     def find_device_by_type(self, microscope, device_type):
-        """Returns elements of the requested type according to the microscope selected
+        """Returns element of the requested type according to the microscope selected
 
         Parameters
         ------------
@@ -218,15 +319,59 @@ class MyApp(CTk):
 
         Returns
         ------------
-        find_device_by_type : `list(class)`
-            Returns the list of objects corresponding to the requested class
+        find_device_by_type : `class`
+            Returns the object corresponding to the requested class
         """
         for device in microscope.devices:
             if isinstance(device, device_type):
                 return device
         return None
+    
+    def find_devices_by_type(self, microscope, device_type):
+        """Returns all elements of the requested type according to the microscope selected
 
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains the selected microscope for which we are looking for elements
+        device_type, `class`
+            Contains the class to be checked
 
+        Returns
+        ------------
+        find_devices_by_type : `list(class)`
+            Returns the list of objects corresponding to the requested class
+        """
+        all_devices = []
+        for device in microscope.devices:
+            if isinstance(device, device_type):
+                all_devices.append(device)
+        
+        if all_devices != []:
+            return all_devices
+        
+        return None
+
+    def find_device_by_serial(self, microscope, serial):
+        """Returns element of the requested serial number according to the microscope selected
+
+        Parameters
+        ------------
+        microscope, `MyMicroscope`
+            Contains the selected microscope for which we are looking for elements
+        serial, `string`
+            Contains the serial number to be checked
+
+        Returns
+        ------------
+        find_device_by_type : `class`
+            Returns the object corresponding to the requested serial number
+        """
+        for device in microscope.devices:
+            if device.serial == serial:
+                return device
+        return None
+    
     def stop_devices(self):
         """Stops and disconnects all devices currently in use, 
         then returns to the main menu
@@ -238,7 +383,7 @@ class MyApp(CTk):
         self.menu()
 
 
-    def notification(self, head_message=None, message=None, color=None):
+    def notification(self, head_message=None, message=None, color=None, path=""):
         """Creates notifications attached to the main window. 
         Also supports visual stacking of notifications
 
@@ -251,7 +396,7 @@ class MyApp(CTk):
         color : `str`, optional
             Notification border color. Grey by default
         """
-        notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time)
+        notification = Notification(head_message, message, color, time_before_delete=self.visible_notif_time, path = path)
         self.notif_list.insert(0, notification)
         shift = notification.height * self.scale + 8
         for notif in self.notif_list[1:]:
@@ -289,6 +434,10 @@ class MyApp(CTk):
         self.stop_devices()
         self.destroy()
 
+    def __repr__(self):
+        return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
+
+
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
@@ -314,3 +463,17 @@ class MyMicroscope:
 
     def __repr__(self):
         return f"Devices in the {self.name} microscope :\n\t" + "\n\t".join([f"{device}" for device in self.devices]) + "\n"
+
+
+
+
+
+
+
+
+
+
+
+
+
+

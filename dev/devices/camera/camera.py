@@ -1,3 +1,4 @@
+from dev.debugHelp import debugp
 from .windows_setup import configure_path
 from .camera_sdk.tl_camera import TLCameraSDK
 from .camera_sdk.tl_camera_enums import SENSOR_TYPE
@@ -30,12 +31,14 @@ class MyCamera():
         self.connected = False
         self.is_running = False
         self.image_acquisition_thread = None
+        self.sftt_timer = False
+        self.software_trigger_timer = threading.Timer(0.3,self.software_trigger_timer_done)
 
 
     def connect(self):
         """Try to establish communication with the device
 
-        Retruns
+        Returns
         ------------
         connect : `bool`
             Whether communication is established
@@ -50,7 +53,8 @@ class MyCamera():
                 self.camera.frames_per_trigger_zero_for_unlimited = 0
                 self.camera.arm(2)
                 self.camera.issue_software_trigger()
-                self.connected = self.sdk._is_sdk_open
+                self.connected = self.sdk._is_sdk_open  
+                self.software_trigger_timer.start()              
         except Exception as e:
             pass
         return self.connected
@@ -67,12 +71,14 @@ class MyCamera():
         if self.connected and not self.is_running and not self.image_acquisition_thread:
             self.image_acquisition_thread = ImageAcquisitionThread(self.camera)
             self.image_acquisition_thread.start()
+            debugp("Thread", "Camera thread started")
+            #debugp("Thread", f"Camera thread started - {self}")
             self.is_running = True
         return self.image_acquisition_thread.get_output_queue()
 
 
     def stop(self):
-        """Stops spectrometer data acquisition thread
+        """Stops camera data acquisition thread
         """
         if self.connected and self.is_running and self.image_acquisition_thread:
             self.image_acquisition_thread.stop()
@@ -90,6 +96,38 @@ class MyCamera():
             self.camera.dispose()
             self.sdk.dispose()
             self.connected = False
+            
+    def update_exposure(self, value):
+        """Change the exposure in microseconds
+        
+            Parameters
+            ------------
+            value : `float`
+                Visible name of this device in the graphical interface
+        """
+        
+        if self.connected and self.is_running and self.sftt_timer:
+            """The time, in microseconds (us), that charge is integrated on the image sensor.
+            To convert milliseconds to microseconds, multiply the milliseconds by 1,000.
+            To convert microseconds to milliseconds, divide the microseconds by 1,000.
+            """
+            self.camera.exposure_time_us = value * 1000
+            print("Exposure time updated : ", self.camera.exposure_time_us)
+        else:
+            print(f"Can't update exposure time : \nCam connected:{self.connected}\nCam running:{self.is_running}\nTimer Finished{self.sftt_timer}")
+
+    def software_trigger_timer_done(self):
+            self.sftt_timer = True
+            print("SFTTTimer Done")
+            
+    def isPluggedIn(self):
+        sdk = TLCameraSDK()
+        camera_list = sdk.discover_available_cameras()
+        return self.serial in camera_list
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"
+
 
 
     def __repr__(self):
@@ -108,6 +146,7 @@ class ImageAcquisitionThread(threading.Thread):
         camera : `MyCamera`
             Object containing all information about a camera
         """
+        
         super(ImageAcquisitionThread, self).__init__()
         self._camera = camera
         self._previous_timestamp = 0
@@ -132,7 +171,8 @@ class ImageAcquisitionThread(threading.Thread):
 
         self._bit_depth = camera.bit_depth
         self._camera.image_poll_timeout_ms = 0
-        self._image_queue = queue.Queue(maxsize=2)
+        self._image_queue = queue.Queue(maxsize=1)
+        #self._image_queue = queue.SimpleQueue()
         self._stop_event = threading.Event()
 
 
@@ -208,7 +248,18 @@ class ImageAcquisitionThread(threading.Thread):
                         pil_image = self._get_color_image(frame)
                     else:
                         pil_image = self._get_image(frame)
+
+                    if self._image_queue.full:
+                        try:
+                            self._image_queue.get_nowait()
+                        except queue.Empty:
+                            pass
+
                     self._image_queue.put_nowait(pil_image)
+                    
+                #Test
+                #frame.dispose()
+                    
             except queue.Full:
                 pass
             except Exception as error:
@@ -217,4 +268,5 @@ class ImageAcquisitionThread(threading.Thread):
         if self._is_color:
             self._mono_to_color_processor.dispose()
             self._mono_to_color_sdk.dispose()
-
+    
+    

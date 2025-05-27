@@ -3,6 +3,8 @@ import threading
 import queue
 import time
 
+from dev.debugHelp import debugp
+
 
 class MySpectrometer():
     """Class for creating an object that communicates with and controls a spectrometer-type device"""
@@ -48,7 +50,11 @@ class MySpectrometer():
         self.is_running = False
         try:
             self.spectrometer = Spectrometer.from_serial_number(self.serial)
-            self.connected = True
+            
+            temp = self.get_temperature()
+            if temp != None and temp < 0 :
+                self.connected = True
+            
         except Exception as e:
             pass
         return self.connected
@@ -58,6 +64,8 @@ class MySpectrometer():
         """Starts spectrometer data acquisition thread
         """
         if self.connected and not self.is_running:
+            debugp("Thread", "Spectrometer thread started")
+            #debugp("Thread", f"Spectrometer thread started - {self}")
             self.is_running = True
             self.data_thread = threading.Thread(target=self.acquire_data, daemon=True)
             self.data_thread.start()
@@ -76,12 +84,18 @@ class MySpectrometer():
             self.index = 0
             while self.is_running:
                 wavelengths, intensities = self.spectrometer.spectrum(correct_dark_counts=self.dark_correction)
-                self.chart_queue.put((wavelengths, intensities))
+                
+                #Test faster ???
+                if not self.chart_queue.empty():
+                    self.chart_queue.get_nowait() 
+                self.chart_queue.put_nowait((wavelengths, intensities))
+                
                 if self.acquire_save_data > 0:
                     self.index += 1
                     if self.index >= self.acquire_save_data:
                         self.index = 0
                         self.save_queue.put((wavelengths, intensities))
+
         except Exception as e:
             print(f"Error in sepectrometer acquisition: {e}")
 
@@ -98,8 +112,9 @@ class MySpectrometer():
         if self.connected:
             self.stop()
             time.sleep(0.2)
-            self.spectrometer.close()
+            self.spectrometer.close() #Maybe we shouldn't use .close() ?
             self.connected = False
+            print(f"{self.name} disconnected.")
 
 
     def set_integration_time(self, time_microseconds):
@@ -114,6 +129,16 @@ class MySpectrometer():
             self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
 
+    def get_temperature(self):
+        try:
+            # Check if TEC is enabled (Power Supply)
+            tec_status = self.spectrometer.f.thermo_electric.enable_tec(True)
+            tec_temp = self.spectrometer.f.thermo_electric.read_temperature_degrees_celsius()
+            debugp("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
+            return tec_temp
+        except Exception as e:
+            debugp("TEC", f"Tec not working : {e}")
+        return
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

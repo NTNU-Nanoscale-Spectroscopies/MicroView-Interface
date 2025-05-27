@@ -1,3 +1,7 @@
+from tkinter import messagebox
+from CTkToolTip import *
+from dev.debugHelp import debugp
+from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
 from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
@@ -47,7 +51,7 @@ class QuickSetupFrame(CTkScrollableFrame):
             elif isinstance(device, MySpectrometer):
                 master_frame = self.master.master.master.spectrometer_frame
                 entry = CTkEntry(frame, width=100, placeholder_text=device.integration_time/1000)
-                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valide_entry(d,e))
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_integ_entry(d,e))
                 label = CTkLabel(frame, text="ms")
                 button.pack(side="left", padx=(10,5))
                 entry.pack(side="left")
@@ -68,7 +72,33 @@ class QuickSetupFrame(CTkScrollableFrame):
                 button.configure(command=lambda d=device, b=button: self.toggle_shutter(d,b))
                 button.pack(side="left")
                 widgets.append((button,"Shutter"))
+                
+            elif isinstance(device, MyRotationMount):
+                entry = CTkEntry(frame, width=50, placeholder_text="0")
+                home_btn = CTkButton(frame, text="🏠", width=30, state="disabled",     command=lambda d=device, e=entry: (e.delete(0, "end"), e.insert(0, "0"), d.home()))
+                CTkToolTip(home_btn, delay=0.2, message="Rotation Mount Home") 
+                auto_calibration_btn = CTkButton(frame, image=img_auto_calibration, width=30, text=None, state="disabled",     command=device.start_auto_calibration)
+                CTkToolTip(auto_calibration_btn, delay=0.2, message="Auto Calibrate") 
+                label = CTkLabel(frame, text="°")
+                button = CTkButton(frame, text="Set", width=30, state="disabled", command=lambda d=device, e=entry: self.check_valid_angle_entry(d,e))
+                settings = CTkButton(frame, text="⁞", width=1, state="disabled", command=lambda d=device : self.open_rotation_mount_settings(d))
+                CTkToolTip(settings, delay=0.2, message="Settings") 
 
+                settings.pack(side="left", padx=(0,0))
+                home_btn.pack(side="left", padx=(5,5))
+                button.pack(side="left", padx=(5,5))
+                entry.pack(side="left")
+                label.pack(side="left", padx=3)
+                auto_calibration_btn.pack(side="left", padx=(10,5))
+                entry.configure(state="disabled")
+                widgets.append((settings,""))
+                widgets.append((button,""))
+                widgets.append((entry,""))
+                widgets.append((home_btn,""))
+                widgets.append((auto_calibration_btn,""))
+                widgets.append((label,"NonDisableable"))
+
+            #Add device to left hand tab and setup its switch
             self.device_entries.append(DeviceEntry(switch, device, widgets, master_frame))
             switch.configure(command=lambda e=self.device_entries[-1]: self.toggle_device(e))
 
@@ -85,14 +115,33 @@ class QuickSetupFrame(CTkScrollableFrame):
         In the case of spectrometers, if a spectrometer is already connected,
         we move on to the next piece of equipment to avoid display problems
         """
-        spectrometer_already_open = False
-        for entry in self.device_entries:
-            if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
+        
+        #spectrometer_already_open = False
+        for entry in self.device_entries:            
+            
+            # if isinstance(entry.device, MySpectrometer) and spectrometer_already_open: continue
+            
+            #Get the frame to establish a connction, or get the device name to display error message
             element = entry.frame or entry.device
-            if not element.connect():
-                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
-            elif isinstance(entry.device, MySpectrometer):
-                spectrometer_already_open = True
+            
+            #If spectrometer, connect the right one if not connect the device normally
+            if isinstance(entry.device, MySpectrometer):  
+                if not element.connect(entry.device):
+                    print(f"{entry.frame} , {entry.device}")
+                    print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+            else:
+                if not element.connect():
+                    print(f"{entry.frame} , {entry.device}")
+                    print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+            
+            # elif isinstance(entry.device, MySpectrometer):
+            #     spectrometer_already_open = True
+                
+            debugp("connecting", "Connected device : " + str(element))
+              
+        debugp("connecting", "checking connected devices")  
         self.check_connected_devices()
 
 
@@ -100,6 +149,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         """For each device, update the element's graphic content to match its actual state
         """
         for entry in self.device_entries:
+            #debugp("connecting", "checking device : " + str(entry))
             entry.activate() if entry.is_device_connected() else entry.desactivate()
 
 
@@ -116,17 +166,43 @@ class QuickSetupFrame(CTkScrollableFrame):
         entry : `DeviceEntry`
             Contains all graphic elements associated with a device
         """
-        element = entry.frame or entry.device
-        if isinstance(entry.device, MySpectrometer):
-            if element.spectrometer != entry.device:
-                element.disconnect()
-                element.spectrometer = entry.device
+        # element = entry.frame or entry.device
+        # if isinstance(entry.device, MySpectrometer):
+        #     if element.spectrometer != entry.device:
+        #         element.disconnect()
+        #         element.spectrometer = entry.device
 
-        if entry.switch.get():
-            if not element.connect():
-                self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+        element = entry.frame or entry.device
+        debugp("connecting", "Toggle device " + str(element))
+        
+        # if isinstance(entry.device, MySpectrometer):
+        #     for spec in element.spectrometers:
+        #         if spec != entry.device:
+        #             element.disconnect(spec)
+        #             #element.spectrometer = entry.device
+
+        if isinstance(entry.device, MySpectrometer):
+            if entry.switch.get():
+                if not element.connect(entry.device):
+                    debugp("connecting", "Spectrometer Not Connecting Manually" + str(element))
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                else:
+                    debugp("connecting", "Spectrometer Connecting Manually" + str(element))
+            else:
+                debugp("connecting", "Spectrometer Disconnecting Manually" + str(element))
+                element.disconnect(entry.device)
         else:
-            element.disconnect()
+            if entry.switch.get():
+                if not element.connect():
+                    print("Tried to connect to device, unsuccessful (toggle_device)")
+                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                else:
+                    debugp("connecting", "Connecting " + str(element))
+            else:
+                debugp("connecting", "Disconnecting " + str(element))
+                element.disconnect()
+            
+        debugp("connecting", "Check conneced devices")
         self.check_connected_devices()
 
 
@@ -141,6 +217,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         for entry in self.device_entries:
             if entry.device == frame_device:
                 entry.switch.select()
+                print("Trying to reconnect device (reconnection QuickSetupFrame)")
                 self.toggle_device(entry)
                 break
 
@@ -159,7 +236,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         update_shutter_button_style(button, device)
 
 
-    def check_valide_entry(self, device, entry):
+    def check_valid_integ_entry(self, device, entry):
         """Checks the validity of content entered by users before saving it.
         If the content is inappropriate, an error notification is sent to the user
 
@@ -182,6 +259,28 @@ class QuickSetupFrame(CTkScrollableFrame):
         except:
             self.notification(f"Integration time must be a number", "#8e0101")
 
+    def check_valid_angle_entry(self, device, entry):
+        """Checks the validity of content entered by users before saving it.
+        If the content is inappropriate, an error notification is sent to the user
+
+        Note that the input value must be a positive float between 8 and 1600000
+        
+        Parameters
+        ------------
+        device : `MyRotationMount`
+            Object containing all the information related to a rotation mount
+        entry : `CTkEntry`
+            Graphic elements associated with the rotation mount
+        """
+        try:
+            value = float(entry.get())
+            if 0 <= value <= 360:
+                device.set_absolute_angle(value)
+                self.notification(f"Set angle to {value}°", "#1a8300")
+            else:
+                self.notification(f"Angle must be between 0° and 360°", "#8e0101")
+        except:
+            self.notification(f"Integration time must be a number", "#8e0101")
 
     def update_scrollbar_visibility(self):
         """This method allows to hide/show the scrollbar according to the space available in the `setup frame`.
@@ -209,7 +308,69 @@ class QuickSetupFrame(CTkScrollableFrame):
             Sub-content used to display the path of the last saved file. None by default
         """
         self.master.master.master.notification(head_message, message, color)
+     
+    def open_rotation_mount_settings(self, device):
+        self.popup = CTkToplevel(self)
+        self.popup.title("Rotation Mount Settings")
+        self.popup.geometry("330x330")  # Increased height to accommodate new elements
+        self.popup.resizable(True, True)
 
+        # Degrees input
+        self.label3 = CTkLabel(self.popup, text="Step Angle (°):")
+        self.label3.pack(pady=(10, 5))
+        self.degree_entry = CTkEntry(self.popup, width=220, placeholder_text="1")
+        self.degree_entry.pack()
+
+        # Run Sweep Button
+        self.sweep_btn = CTkButton(self.popup, text="Run Sweep", command=lambda d=device: self.begin_sweep(d))
+        self.sweep_btn.pack(pady=(5, 10))
+
+        # Calibration folder input
+        self.label1 = CTkLabel(self.popup, text="Calibration folder name:")
+        self.label1.pack(pady=(15, 5))
+        self.text_entry = CTkEntry(self.popup, width=220, placeholder_text=device.auto_calibrate.calibration_folder)
+        self.text_entry.pack()
+
+        # Wavelength input
+        self.label2 = CTkLabel(self.popup, text="Wavelength to calibrate on:")
+        self.label2.pack(pady=(10, 5))
+        self.num_entry = CTkEntry(self.popup, width=220, placeholder_text=device.auto_calibrate.calibration_wavelength)
+        self.num_entry.pack()
+        
+        # Button Frame
+        button_frame = CTkFrame(self.popup)
+        button_frame.pack(pady=20)
+        
+        self.save_btn = CTkButton(button_frame, text="Save", command=lambda d=device: self.rotation_mount_save(d))
+        self.save_btn.grid(row=0, column=0, padx=10)
+
+        self.cancel_btn = CTkButton(button_frame, text="Cancel", command=self.popup.destroy)
+        self.cancel_btn.grid(row=0, column=1, padx=10)
+
+        self.popup.transient(self)
+
+    def begin_sweep(self, device):
+        # Placeholder function for sweep logic        
+        try:
+            degree_value = int(self.degree_entry.get())
+            device.start_sweep(degree_value)
+            self.popup.destroy()
+        except ValueError:
+            messagebox.showerror("Invalid Step Angle", "Please enter a valid number.")
+            return
+        
+
+    def rotation_mount_save(self, device):
+        folder_name = self.text_entry.get()
+        try:
+            wavelength = float(self.num_entry.get())
+        except ValueError:
+            messagebox.showerror("Invalid Wavelength", "Please enter a valid number.")
+            return
+
+        print(wavelength)
+        device.set_settings(wavelength, folder_name)
+        self.popup.destroy()
 
 
 class DeviceEntry:
