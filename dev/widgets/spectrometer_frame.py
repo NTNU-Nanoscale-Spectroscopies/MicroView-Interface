@@ -320,18 +320,27 @@ class SpectrometerFrame(CTkFrame):
             debugp("spec", "Aborted updating graph")
             return
         
+        update_interval = 20
+        
         if self.connected_spectrometers:
            
             index = 0 if len(self.connected_spectrometers) == 1 else self.split - 1
             spec = self.connected_spectrometers[index]
-
+            
+            #Minimise useless spectrometer updates
+            update_interval = max(20, int(spec.integration_time / 1000))
+            
             if spec.is_running and not spec.chart_queue.empty():
                 self.update_plot(spec, self.plot, index)
 
                 if spec.chart_queue.empty():
                     self.canvas.draw()
 
-        self.after(20, lambda: self.update_graph(False))
+        #print(f"Finished updating graph {datetime.now():%H.%M.%S}")
+        
+        #THIS COULD BE THE SOURCE OF THE CAMERA LAG (update_graph could wait too long to acquire data)
+        self.after(update_interval, lambda: self.update_graph(False))
+
                 
 
     def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):

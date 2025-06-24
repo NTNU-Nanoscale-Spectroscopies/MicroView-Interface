@@ -63,7 +63,8 @@ class MySimSpectrometer(MySpectrometer):
                             self.index = 0
                             self.save_queue.put((wavelengths, intensities))
                     
-                    time.sleep(0.1)
+                    #print(f"Updating every {self.integration_time} {self.integration_time/1000000}, got spec data")
+                    time.sleep(self.integration_time/1000000)
 
             except Exception as e:
                 print(f"Error in spectrometer acquisition: {e}")
@@ -177,6 +178,7 @@ class MySimSpectrometer(MySpectrometer):
         if self.connected:
             #self.spectrometer.integration_time_micros(time_microseconds)
             self.integration_time = time_microseconds
+            #print(f"Integration time : {time_microseconds}")
 
     def get_temperature(self):
         if self.name == "Spectrometer-VIS":
