@@ -15,8 +15,6 @@ def plot_data(data):
     plt.show()
 
 
-
-
 def read_spectrum_file(filepath):
     with open(filepath, 'r') as f:
         lines = f.readlines()
@@ -51,10 +49,6 @@ def plot_3d_spectra(folder_path, wavelength_min=None, wavelength_max=None):
     plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
     plt.show()
-
-
-
-
 
 
 

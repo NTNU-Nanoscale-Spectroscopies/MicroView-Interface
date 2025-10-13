@@ -845,7 +845,7 @@ class SpectrometerFrame(CTkFrame):
             self.plot.legend()
             self.canvas.draw()
 
-
+# Could be implemented in the future
     def extend(self):
         """Not available.
         The purpose of this method is to open the spectrometer frame in a 

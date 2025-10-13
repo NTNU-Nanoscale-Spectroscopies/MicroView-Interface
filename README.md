@@ -61,3 +61,4 @@ This project would not have been possible without these contributors :
 - **Julia LÖVGREN** - Project supervisor
 - **Noah JACOB** - Developer
 - **Oliver Mineau** - Developer
+- **Eirik Lu** - Developer

@@ -1,3 +1,14 @@
+v3.0.2
+
+    Added:
+        Advanced save brought back
+        Start/stop angle input added for sweep
+    
+    Removed:
+
+    Bugs:
+        No fixes yet
+
 v3.0.0
 
     Added :

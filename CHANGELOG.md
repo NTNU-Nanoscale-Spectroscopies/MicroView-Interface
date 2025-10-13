@@ -1,5 +1,10 @@
 # Changelog
 
+## [3.0.2] - 2025-10-13
+### <span style="color:green"> Added </span>
+- Dev : Advanced save brought back.
+- Dev : Added Start/Stop input angle for sweep
+
 ## [3.0.0] - 2025-06-04
 ### <span style="color:green"> Added </span>
 - Dev : AutoCalib integration and sweeping functionality.

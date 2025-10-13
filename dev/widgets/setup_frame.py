@@ -309,10 +309,11 @@ class QuickSetupFrame(CTkScrollableFrame):
         """
         self.master.master.master.notification(head_message, message, color)
      
+    # Needs new option to prompt user for sweep start stop angle and step size. Pass two user inputted variables to the sweep logic (rotation_mount.py)
     def open_rotation_mount_settings(self, device):
         self.popup = CTkToplevel(self)
         self.popup.title("Rotation Mount Settings")
-        self.popup.geometry("330x330")  # Increased height to accommodate new elements
+        self.popup.geometry("450x500")  # Increased height to accommodate new elements
         self.popup.resizable(True, True)
 
         # Degrees input
@@ -320,6 +321,18 @@ class QuickSetupFrame(CTkScrollableFrame):
         self.label3.pack(pady=(10, 5))
         self.degree_entry = CTkEntry(self.popup, width=220, placeholder_text="1")
         self.degree_entry.pack()
+
+        # Start Angle input (default 0)
+        self.label_start = CTkLabel(self.popup, text="Start Angle (°):")
+        self.label_start.pack(pady=(10, 5))
+        self.start_entry = CTkEntry(self.popup, width=220, placeholder_text="0")
+        self.start_entry.pack()
+
+        # Stop Angle input (default 360)
+        self.label_stop = CTkLabel(self.popup, text="Stop Angle (°):")
+        self.label_stop.pack(pady=(10, 5))
+        self.stop_entry = CTkEntry(self.popup, width=220, placeholder_text="360")
+        self.stop_entry.pack()
 
         # Run Sweep Button
         self.sweep_btn = CTkButton(self.popup, text="Run Sweep", command=lambda d=device: self.begin_sweep(d))
@@ -352,8 +365,28 @@ class QuickSetupFrame(CTkScrollableFrame):
     def begin_sweep(self, device):
         # Placeholder function for sweep logic        
         try:
-            degree_value = int(self.degree_entry.get())
-            device.start_sweep(degree_value)
+            # Read and validate step angle
+            degree_value = int(self.degree_entry.get()) if self.degree_entry.get() else int(self.degree_entry.placeholder_text)
+            # Read start/stop angles, fall back to placeholders/defaults when empty
+            start_text = self.start_entry.get() if hasattr(self, 'start_entry') else ''
+            stop_text = self.stop_entry.get() if hasattr(self, 'stop_entry') else ''
+            start_value = float(start_text) if start_text else float(self.start_entry.placeholder_text)
+            stop_value = float(stop_text) if stop_text else float(self.stop_entry.placeholder_text)
+
+            # Basic validation
+            if degree_value <= 0:
+                messagebox.showerror("Invalid Step Angle", "Step angle must be a positive integer.")
+                return
+
+            # Normalize angles into integers and a 0-360 range
+            start_value = int(start_value) % 360
+            # allow 360 as stop to represent full circle; normalize to 360 if entry is 360 specifically
+            if float(stop_text) == 360.0 if stop_text else (float(self.stop_entry.placeholder_text) == 360.0):
+                stop_value = 360
+            else:
+                stop_value = int(float(stop_value)) % 360
+
+            device.start_sweep(degree_value, start_angle=start_value, stop_angle=stop_value)
             self.popup.destroy()
         except ValueError:
             messagebox.showerror("Invalid Step Angle", "Please enter a valid number.")
