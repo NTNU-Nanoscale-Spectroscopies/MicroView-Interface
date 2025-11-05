@@ -34,6 +34,7 @@ class MyCamera():
         self.sftt_timer = False
         self.software_trigger_timer = threading.Timer(0.3,self.software_trigger_timer_done)
 
+
     def connect(self):
         """Try to establish communication with the device
 
@@ -125,6 +126,11 @@ class MyCamera():
         sdk = TLCameraSDK()
         camera_list = sdk.discover_available_cameras()
         return self.serial in camera_list
+
+    def __repr__(self):
+        return f"{self.name}, serial : {self.serial}"
+
+
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
