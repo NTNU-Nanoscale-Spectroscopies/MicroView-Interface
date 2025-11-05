@@ -1,5 +1,38 @@
 # Changelog
 
+## [3.0.2] - 2025-10-13
+### <span style="color:green"> Added </span>
+- Dev : Advanced save brought back.
+- Dev : Added Start/Stop input angle for sweep
+
+## [3.0.0] - 2025-06-04
+### <span style="color:green"> Added </span>
+- Dev : AutoCalib integration and sweeping functionality.
+- Dev : Debug graph for visual diagnostics.
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : Debugging and minor bug fixes related to new features.
+
+## [2.2.0] - 2025-05-20
+### <span style="color:green"> Added </span>
+- Dev : Sweep feature with spectrometer TEC safety added.
+- Dev : File name includes timestamp.
+
+## [2.1.9] - 2025-05-19
+### <span style="color:green"> Added </span>
+- Dev : Polarizer control routine added (testing phase).
+
+## [2.1.8] - 2025-05-12
+### <span style="color:green"> Added </span>
+- Dev : Spectrometer power supply test mode added.
+
+## [2.1.7] - 2025-05-08
+### <span style="color:green"> Added </span>
+- Dev : AutoCalibration routine added.
+
+## [2.1.6] - 2025-04-22
+### <span style="color:green"> Added </span>
+- Dev : Auto connect feature implemented.
+
 ## [2.1.5] - 2025-04-08
 ### <span style="color:green"> Added </span>
 - Dev : Save button saves light and dark references when updated.

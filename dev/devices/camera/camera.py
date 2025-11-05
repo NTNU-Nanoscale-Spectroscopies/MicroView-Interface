@@ -43,11 +43,13 @@ class MyCamera():
         connect : `bool`
             Whether communication is established
         """
+        
         self.connected = False
         self.is_running = False
         try:
             self.sdk = TLCameraSDK()
             self.camera_list = self.sdk.discover_available_cameras()
+            print(self.sdk.discover_available_cameras())
             if self.serial in self.camera_list:
                 self.camera = self.sdk.open_camera(self.serial)
                 self.camera.frames_per_trigger_zero_for_unlimited = 0

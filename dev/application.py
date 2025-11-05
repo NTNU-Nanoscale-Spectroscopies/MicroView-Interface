@@ -82,7 +82,7 @@ class MyApp(CTk):
         try:
             module = import_thorlab_lib("thorlabs_setup", r"dev\devices\camera\dlls\thorlabs_setup.pyc")
             module.ThorlabsSetup(self)
-        except:
+        except Exception as e:
             debugp("","")
         
         #Auto connect via connected camera serial

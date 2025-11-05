@@ -128,30 +128,96 @@ class MyRotationMount():
 
     def set_settings(self, folder_name, wavelength):
         self.auto_calibrate.set_settings(folder_name, wavelength)
-            
-    def start_sweep(self, step_angle, sweep_folder=None):
+
+
+    # New input variables
+    def start_sweep(self, step_angle, sweep_folder=None, start_angle=0, stop_angle=360):
+        """
+        Start a sweep from start_angle to stop_angle using given step_angle.
+
+        Parameters
+        -----------
+        step_angle : int
+            Step increment in degrees (must be > 0)
+        sweep_folder : str or None
+            Optional folder name for saving
+        start_angle : int
+            Start angle in degrees (0-359). Default 0.
+        stop_angle : int
+            Stop angle in degrees (1-360). Default 360 means full circle.
+        """
         self.spectrometer.acquire_save_data = 1
-        thread = threading.Thread(target=lambda: self.start_threaded_sweep(step_angle, sweep_folder), daemon=True)
+        thread = threading.Thread(target=lambda: self.start_threaded_sweep(step_angle, sweep_folder, start_angle, stop_angle), daemon=True)
         thread.start()
         self.set_unavailable(f"Sweeping...")        
-        
-    def start_threaded_sweep(self, step_angle, sweep_folder=None):
 
-        if sweep_folder != None:
+    # New input variables    
+    def start_threaded_sweep(self, step_angle, sweep_folder=None, start_angle=0, stop_angle=360):
+
+        if sweep_folder is not None:
             self.sweep_folder_name = sweep_folder
-        
+
+        # Normalize inputs
+        try:
+            step = int(step_angle)
+            if step <= 0:
+                raise ValueError("Step angle must be > 0")
+        except Exception:
+            self.set_available()
+            self.spectrometer.acquire_save_data = 0
+            return
+
+        start = int(start_angle) % 360
+        # Treat stop_angle == 360 as full-circle sentinel
+        stop_raw = int(stop_angle)
+        stop = 360 if stop_raw == 360 else (stop_raw % 360)
+
+        # Build list of angles to visit (inclusive of stop when stop==360)
+        angles = []
+        if stop == 360:
+            # full circle: go from start to start+360-step
+            total_steps = (360 + (step - 1)) // step
+            for i in range(total_steps):
+                angles.append((start + i * step) % 360)
+        else:
+            # Non-wrap case
+            if start <= stop:
+                current = start
+                while current <= stop:
+                    angles.append(current % 360)
+                    current += step
+            else:
+                # Wrap-around case: start > stop
+                current = start
+                # go from start up to 359
+                while current < 360:
+                    angles.append(current % 360)
+                    current += step
+                # then from 0 up to stop
+                current = 0
+                while current <= stop:
+                    angles.append(current % 360)
+                    current += step
+
         date = f"{datetime.now():%H.%M.%S}"
-        for angle in range(0, 360, step_angle):
-            print(angle)
+
+        total = len(angles)
+        for idx, angle in enumerate(angles):
             real_angle = angle % 360
             self.set_absolute_angle(real_angle)
+            # Wait for spectrometer integration time (integration_time is in microseconds previously used?)
             time.sleep((self.spectrometer.integration_time / 1_000_000) + 0.3)
-            wavelengths, intensities = self.spectrometer.chart_queue.get()
-            
-            self.set_unavailable(f"Measuring {int(angle/step_angle)}/{round(360/step_angle)}\nAngle :{angle}°")
-            
+            # Get measurement
+            try:
+                wavelengths, intensities = self.spectrometer.chart_queue.get(timeout=5)
+            except Exception:
+                # If no data, skip this angle
+                continue
+
+            self.set_unavailable(f"Measuring {idx+1}/{total}\nAngle :{angle}°")
+
             file_path = self.spectrometer_frame.file_system.get_spectrometer_directory(self.spectrometer.integration_time, self.spectrometer.name, self.sweep_folder_name)
-            file_path = file_path.replace("#", f"{int(angle/step_angle)}_{angle}deg_").replace("@", date).replace("$", self.spectrometer.name.split("-")[-1])
+            file_path = file_path.replace("#", f"{idx}_{angle}deg_").replace("@", date).replace("$", self.spectrometer.name.split("-")[-1])
 
             self.spectrometer_frame.single_save(
                 f"{file_path}", wavelengths, intensities,

@@ -168,9 +168,9 @@ class SpectrometerFrame(CTkFrame):
             self.save_button.grid(row=1, column=0, padx=5, pady=5, sticky="nw")
             CTkToolTip(self.save_button, delay=0.2, message="Single Save") 
 
-            # self.adv_save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
-            # self.adv_save_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
-            # CTkToolTip(self.adv_save_button, delay=0.2, message="Advanced Save") 
+            self.adv_save_button = CTkButton(self, text="", width=40, height=40, image=img_advanced_save, fg_color="transparent", command=self.advanced_save_popup)
+            self.adv_save_button.grid(row=5, column=0, padx=5, pady=5, sticky="nw")
+            CTkToolTip(self.adv_save_button, delay=0.2, message="Advanced Save") 
 
             self.reflectance_data_button = CTkButton(self, text="%", font=("Arial", 25), width=40, height=40, fg_color="transparent", command=self.toggle_mode)
             self.reflectance_data_button.grid(row=2, column=0, padx=5, pady=5, sticky="nw")
@@ -320,18 +320,27 @@ class SpectrometerFrame(CTkFrame):
             debugp("spec", "Aborted updating graph")
             return
         
+        update_interval = 20
+        
         if self.connected_spectrometers:
            
             index = 0 if len(self.connected_spectrometers) == 1 else self.split - 1
             spec = self.connected_spectrometers[index]
-
+            
+            #Minimise useless spectrometer updates
+            update_interval = max(20, int(spec.integration_time / 1000))
+            
             if spec.is_running and not spec.chart_queue.empty():
                 self.update_plot(spec, self.plot, index)
 
                 if spec.chart_queue.empty():
                     self.canvas.draw()
 
-        self.after(20, lambda: self.update_graph(False))
+        #print(f"Finished updating graph {datetime.now():%H.%M.%S}")
+        
+        #THIS COULD BE THE SOURCE OF THE CAMERA LAG (update_graph could wait too long to acquire data)
+        self.after(update_interval, lambda: self.update_graph(False))
+
                 
 
     def save_data(self, file_path=None, wavelengths=None, intensities=None, single_save=True, reference=False):
@@ -477,7 +486,7 @@ class SpectrometerFrame(CTkFrame):
             self.notification(f"No data to save", color="#8e0101")
     
     
-    ##Not in use anymore
+    #Brought back
     def advanced_save(self):
         """Handles the advanced save process for spectrometer data.
         Waits briefly to ensure the spectrometer is initialized with the correct integration time. 
@@ -498,7 +507,6 @@ class SpectrometerFrame(CTkFrame):
         self.notification(f"Serial backup completed !", color="#1a8300")
         self.thread_finish = True
 
-    ##Not in use anymore
     def advanced_save_popup(self):
         """Displays the advanced save popup.
         Allows users to configure a data backup sequence
@@ -837,7 +845,7 @@ class SpectrometerFrame(CTkFrame):
             self.plot.legend()
             self.canvas.draw()
 
-
+# Could be implemented in the future
     def extend(self):
         """Not available.
         The purpose of this method is to open the spectrometer frame in a 
@@ -932,7 +940,7 @@ class SpectrometerFrame(CTkFrame):
         self.pause_button.configure(state=state)
         self.play_button.configure(state=state)
         self.save_button.configure(state=state)
-        #self.adv_save_button.configure(state=state)
+        self.adv_save_button.configure(state=state)
         self.reflectance_data_button.configure(state=state)
         self.raw_data_button.configure(state=state)
         self.new_experiment_button.configure(state=state)

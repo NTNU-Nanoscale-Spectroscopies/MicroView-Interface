@@ -102,10 +102,28 @@ class AutoCalibrate():
         if overide_integration_time:
             self.spectrometer.set_integration_time(self.saved_integration_time)
 
+
+        # Extract angles and intensities first
         angles, intensities = angle_intensity[:, 0], angle_intensity[:, 1]
-        self.angles3, self.inten3 = angles, intensities
+        # Create the mask
+        mask = (angles > starting_angle) & (angles < max_angle + padding_angle)
+        # Apply the mask
+        masked_angles = angles[mask]
+        masked_intensities = intensities[mask]
+        # Sort the masked data by angle
+        sorted_indices = np.argsort(masked_angles)
+        masked_angles = masked_angles[sorted_indices]
+        masked_intensities = masked_intensities[sorted_indices]
+        # Save to instance variables
+        self.angles3, self.inten3 = masked_angles, masked_intensities
+        
         sorted_indices = np.argsort(angles)
         angles, intensities = angles[sorted_indices], intensities[sorted_indices]
+        
+        
+        
+        
+        
 
         #self.plot_data(angle_intensity, calibration_folder, "raw_1_deg", self.calibration_wavelength)
         
