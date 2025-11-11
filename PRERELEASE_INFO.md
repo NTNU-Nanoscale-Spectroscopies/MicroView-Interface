@@ -1,3 +1,14 @@
+v3.0.3
+
+    Added:
+        Open folder button
+        White light shutter
+    
+    Removed:
+
+    Bugs:
+        Sweep data duplication
+
 v3.0.2
 
     Added:

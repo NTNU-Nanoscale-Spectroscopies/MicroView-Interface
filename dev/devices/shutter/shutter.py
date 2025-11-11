@@ -5,33 +5,27 @@ from .kst201_shutter import *
 class MyShutter():
     """Class for creating an object that communicates with and controls a shutter-type device"""
 
-    def __init__(self, name, serial, enable=False, model=None):
-        """Create a new Shutter object for easy communication with the device concerned
+    def __init__(self, name, serial, enable=False, model=None, stage=None):
+        """Create a new Shutter object
 
-        Parameters
-        ------------
-        name : `str`
-            Visible name of this device in the graphical interface
-        serial : `str`
-            The unique device serial number enabling communication
-        enable : `bool`, optional
-            Allows or prevents the device from starting once it is connected. False by default
-        model : `str`
-            The model name of the shutter.
-            This affects communication, so be careful to use the correct model. 
-            Current supported models : “KSC101” and “KST201”
+        New parameter:
+        stage : `str`, optional
+            The specific mechanical stage mounted to the controller (e.g. "FW103M").
+            Passed through to the underlying driver to allow index-based control.
         """
         self.name = name
         self.serial = serial
         self.enable = enable
         self.model = model
+        self.stage = stage
         self.connected = False
         self.is_open = False
 
         if self.model == "KSC101":
             self.shutter = KSC101_Shutter(self.serial, self.enable)
         elif self.model == "KST201":
-            self.shutter = KST201_Shutter(self.serial, self.enable)
+            # pass stage through to the KST201 driver (may be None)
+            self.shutter = KST201_Shutter(self.serial, self.enable, stage=self.stage)
 
 
     def connect(self):

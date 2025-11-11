@@ -71,3 +71,4 @@ img_split_left = load_image((20, 20), 'split_screen_left_black.png', 'split_scre
 img_split_right = load_image((20, 20), 'split_screen_right_black.png', 'split_screen_right_white.png')
 img_new_experiment = load_image((25, 25), 'new_experiment_black.png', 'new_experiment_white.png')
 img_auto_calibration = load_image((20, 20), 'compass_black.png', 'compass_white.png')
+img_open_folder = load_image((20, 20), 'folder-into_black.png', 'folder_into_white.png')

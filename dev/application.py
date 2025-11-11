@@ -11,6 +11,10 @@ from .widgets.setup_frame import *
 from .widgets.notification import *
 from .debugHelp import *
 import ctypes
+import os
+import sys
+import subprocess
+from .images.images import img_open_folder
 
 
 class MyApp(CTk):
@@ -148,24 +152,39 @@ class MyApp(CTk):
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
+        # add extra columns for the top-right buttons so they don't overlap
+        self.grid_columnconfigure(2, weight=0)
+        self.grid_columnconfigure(3, weight=0)
         self.grid_rowconfigure((1,2), weight=2)
         self.grid_rowconfigure((3,4), weight=4)
-
+ 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
-        self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
+        # expand title across the extra columns so the right-side buttons have their own space
+        self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=4)
+
         self.back_button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.stop_devices)
         self.back_button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
-        self.settings_button = CTkButton(self, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
-        self.settings_button.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="e")
-        
-        self.user_button = CTkButton(self, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
-        self.user_button.grid(row=0, column=1, padx=(0, 65), pady=10, sticky="e")
+
+        # Top-right button container: place it so it does not affect grid column sizing
+        top_right_frame = CTkFrame(self, fg_color="transparent")
+        # place at the top-right corner of the window (anchor northeast)
+        top_right_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=8)
+
+        self.settings_button = CTkButton(top_right_frame, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
+        self.open_folder_button = CTkButton(top_right_frame, text="", width=35, height=35, image=img_open_folder, fg_color="transparent", border_width=2, border_color="#1F6AA5")
+        self.user_button = CTkButton(top_right_frame, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
+        # Pack right-to-left so user button is furthest right
+        self.user_button.pack(side="right", padx=(5,0))
+        self.open_folder_button.pack(side="right", padx=5)
+        self.settings_button.pack(side="right", padx=5)
 
         self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         
         self.file_system = FileSystem(self, self.backup_directory, self.directory_frame)
-
+        # wire the open-folder button to the FileSystem implementation
+        self.open_folder_button.configure(command=lambda: self.file_system.open_backup_directory())
+        
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
         self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))

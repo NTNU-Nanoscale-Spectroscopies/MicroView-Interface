@@ -6,6 +6,7 @@ import elliptec
 from CTkToolTip import *
 import numpy as np
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
+import os
 
 
 class MyRotationMount():
@@ -146,6 +147,12 @@ class MyRotationMount():
         stop_angle : int
             Stop angle in degrees (1-360). Default 360 means full circle.
         """
+        # We'll perform explicit saves inside the sweep; disable the spectrometer's automatic
+        # save_queue-based saving to avoid duplicated files ("relative sweep").
+        try:
+            self.spectrometer.auto_save_enabled = False
+        except Exception:
+            pass
         self.spectrometer.acquire_save_data = 1
         thread = threading.Thread(target=lambda: self.start_threaded_sweep(step_angle, sweep_folder, start_angle, stop_angle), daemon=True)
         thread.start()
@@ -163,6 +170,11 @@ class MyRotationMount():
             if step <= 0:
                 raise ValueError("Step angle must be > 0")
         except Exception:
+            # Restore spectrometer save behavior on error
+            try:
+                self.spectrometer.auto_save_enabled = True
+            except Exception:
+                pass
             self.set_available()
             self.spectrometer.acquire_save_data = 0
             return
@@ -223,11 +235,25 @@ class MyRotationMount():
                 f"{file_path}", wavelengths, intensities,
                 True, False, self.spectrometer_frame.split - 1, False
             )
+ 
+        # Notify user where sweep files were saved (folder)
+        try:
+            directory = os.path.dirname(file_path) if 'file_path' in locals() and file_path else None
+            if directory:
+                # Use spectrometer_frame.notification to show the standard notification UI
+                self.spectrometer_frame.notification("Sweep completed", f"Saved to {directory}", "#1a8300", path=directory)
+        except Exception:
+            # fail silently to avoid breaking sweep completion
+            pass
 
+        # Restore spectrometer auto-save behavior and clear acquire flag
+        try:
+            self.spectrometer.auto_save_enabled = True
+        except Exception:
+            pass
         self.set_available()
         self.spectrometer.acquire_save_data = 0
 
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
-    

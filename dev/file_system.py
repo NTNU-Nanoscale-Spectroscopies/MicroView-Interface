@@ -1,7 +1,8 @@
-
 from datetime import *
 import os
 import re
+import subprocess
+import sys
 from dev.debugHelp import debugp
 
 
@@ -212,3 +213,47 @@ class FileSystem():
             The username to be displayed in the UI.
         """
         self.app.user_button.configure(text=username.upper())
+
+    def open_backup_directory(self):
+        """Open the current backup directory in the system file explorer.
+           Uses existing FileSystem attributes (self.root, self.user, self.backup_directory)
+           instead of defining any path inside the function.
+        """
+
+        # Prefer the user's root folder (root\<user>), fall back to the current backup path
+        user_directory = os.path.join(self.root, self.user)
+        try:
+            path = os.path.expanduser(user_directory)
+            if not os.path.exists(path):
+                # fall back to the exact backup_directory (may include date/experiment)
+                path = os.path.expanduser(self.backup_directory)
+        except Exception as e:
+            debugp("open_backup_directory", f"Invalid backup path: {e}")
+            if getattr(self, "app", None):
+                self.app.notification("Error", f"Invalid backup path", color="#8e0101")
+            return
+        # If path points to a file, use its directory
+        if os.path.isfile(path):
+            path = os.path.dirname(path)
+ 
+         # Ensure directory exists
+        try:
+             os.makedirs(path, exist_ok=True)
+        except Exception as e:
+             debugp("open_backup_directory", f"Could not create directory: {e}")
+             if getattr(self, "app", None):
+                 self.app.notification("Error", f"Could not create folder: {e}", color="#8e0101")
+             return
+ 
+         # Open in system file explorer
+        try:
+             if sys.platform.startswith("win"):
+                 os.startfile(path)
+             elif sys.platform == "darwin":
+                 subprocess.Popen(["open", path])
+             else:
+                 subprocess.Popen(["xdg-open", path])
+        except Exception as e:
+             debugp("open_backup_directory", f"Failed to open folder: {e}")
+             if getattr(self, "app", None):
+                 self.app.notification("Error", f"Failed to open folder: {e}", color="#8e0101")

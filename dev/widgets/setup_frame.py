@@ -9,6 +9,7 @@ from ..devices.spectrometer import *
 from ..devices.shutter.shutter import *
 from ..devices.filter import *
 from ..devices.stage import *
+import threading
 
 
 class QuickSetupFrame(CTkScrollableFrame):
@@ -232,8 +233,33 @@ class QuickSetupFrame(CTkScrollableFrame):
         button : `CTkButton`
             Graphic element associated with the shutter
         """
-        device.close() if device.state() else device.open()
-        update_shutter_button_style(button, device)
+        # Determine action and give immediate visual feedback, then run move in background
+        action = 'close' if device.state() else 'open'
+        # Show moving state and prevent re-entrant clicks
+        try:
+            button.configure(state="disabled", text="Moving...")
+        except Exception:
+            pass
+
+        def _worker():
+            try:
+                if action == 'open':
+                    device.open()
+                else:
+                    device.close()
+            except Exception as e:
+                print("Shutter toggle error:", e)
+            finally:
+                # Update GUI from main thread
+                def _on_done():
+                    update_shutter_button_style(button, device)
+                    try:
+                        button.configure(state="normal")
+                    except Exception:
+                        pass
+                self.after(0, _on_done)
+
+        threading.Thread(target=_worker, daemon=True).start()
 
 
     def check_valid_integ_entry(self, device, entry):

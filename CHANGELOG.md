@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.0.3] - 2025-11-11
+### <span style="color:green"> Added </span>
+- Dev : Open folder button added
+- Dev : Sweep data duplication fixed
+- Dev : Whithe-light shutter implemented
+
 ## [3.0.2] - 2025-10-13
 ### <span style="color:green"> Added </span>
 - Dev : Advanced save brought back.

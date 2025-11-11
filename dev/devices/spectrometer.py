@@ -36,6 +36,9 @@ class MySpectrometer():
         self.integration_time = integration_time*1000
         self.acquire_save_data = 0
         self.dark_correction = dark_correction
+        # If True, spectrometer will push data to save_queue when acquire_save_data > 0.
+        # Can be temporarily disabled by callers (e.g. rotation mount sweeps) to avoid duplicate saves.
+        self.auto_save_enabled = True
 
 
     def connect(self):
@@ -90,7 +93,8 @@ class MySpectrometer():
                     self.chart_queue.get_nowait() 
                 self.chart_queue.put_nowait((wavelengths, intensities))
                 
-                if self.acquire_save_data > 0:
+                # Only push into save_queue if automatic saving is enabled.
+                if self.acquire_save_data > 0 and getattr(self, "auto_save_enabled", True):
                     self.index += 1
                     if self.index >= self.acquire_save_data:
                         self.index = 0
