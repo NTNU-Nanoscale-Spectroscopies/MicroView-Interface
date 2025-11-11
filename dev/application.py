@@ -56,6 +56,7 @@ class MyApp(CTk):
         
 
 
+
     def menu(self):
         """Displays the application's main menu
         """
@@ -451,6 +452,11 @@ class MyApp(CTk):
             self.camera_frame.on_closing()
         self.stop_devices()
         self.destroy()
+
+    def __repr__(self):
+        return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
+
+
 
     def __repr__(self):
         return f"Microscopes in this application - {self.version} :\n\t" + "\n\t".join([f"{microscope.name}" for microscope in self.microscopes]) + "\n"
