@@ -190,23 +190,43 @@ class MyApp(CTk):
         self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
         self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
         self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
+        # instantiate both left-side panels (devices and routines) but do not grid both simultaneously
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
-        self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
+        self.routines_frame = RoutinesFrame(self, microscope)  # new secondary menu
 
+        # small toggle bar placed above the left panel area (keeps same spot and doesn't affect other widgets)
+        self.left_toggle_frame = CTkFrame(self, fg_color="transparent")
+        # reduce vertical padding so toggle buttons sit closer to the panels
+        # anchor to the bottom-left of the middle row so toggles sit just above the left panels and align to their left edge
+        self.left_toggle_frame.grid(row=2, column=0, padx=(20, 10), pady=(0, 0), sticky="sw")
+ 
+        self.devices_toggle_btn = CTkButton(self.left_toggle_frame, text="Devices", width=100, fg_color="transparent",
+                                            border_width=2, border_color="#1F6AA5",
+                                            command=lambda: self.show_left_panel("devices"))
+        self.routines_toggle_btn = CTkButton(self.left_toggle_frame, text="Routines", width=100, fg_color="transparent",
+                                             border_width=2, border_color="#1F6AA5",
+                                             command=lambda: self.show_left_panel("routines"))
+        # ensure buttons are anchored to the left inside the toggle frame
+        self.devices_toggle_btn.pack(side="left", padx=(0, 8), anchor="w")
+        self.routines_toggle_btn.pack(side="left", anchor="w")
+
+        # show devices panel by default
+        self.show_left_panel("devices")
+ 
         for rotation_mount in self.find_devices_by_type(microscope, MyRotationMount):
                         
             spectrometer_serial = rotation_mount.associated_spectrometer
             if not spectrometer_serial:
                 continue
-            
+        
             spectrometer = self.find_device_by_serial(microscope, spectrometer_serial)
             if not spectrometer:
                 continue
-            
+        
             rotation_mount.setup_auto_calibration(spectrometer, self.spectrometer_frame, self.spectrometer_frame.set_unavailable, self.spectrometer_frame.set_available)
-            
-            #Can't find why this line creates a deiconify bug :\
-            #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
+        
+        #Can't find why this line creates a deiconify bug :\
+        #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
 
         
         self.is_menu = False
@@ -224,8 +244,8 @@ class MyApp(CTk):
             self.popup.title("Settings")
             self.popup.minsize(405, 200)
             self.center_popup(600, 250)
-            self.popup.grid_rowconfigure((1,2), weight=1)
-            self.popup.grid_columnconfigure((0,1), weight=1)
+            self.popup.grid_rowconfigure(1, weight=1)
+            self.popup.grid_columnconfigure(0, weight=1)
             self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
             self.popup.attributes("-topmost", True)
             self.after(50, lambda: self.popup.attributes("-topmost", False))
@@ -401,7 +421,65 @@ class MyApp(CTk):
         self.notif_list = []
         self.menu()
 
+    def show_left_panel(self, name):
+        """Show either 'devices' (QuickSetupFrame) or 'routines' (RoutinesFrame) in the left area.
+        Both frames occupy the exact same grid area so they don't interfere with other widgets.
+        """
+        # hide both
+        try:
+            self.quick_setup_frame.grid_forget()
+        except Exception:
+            pass
+        try:
+            self.routines_frame.grid_forget()
+        except Exception:
+            pass
 
+        # grid the requested panel into the same location
+        if name == "routines":
+            self.routines_frame.grid(row=3, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=2)
+        else:
+            self.quick_setup_frame.grid(row=3, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=2)
+
+        # Visuals: keep border present for both, only swap fill (fg_color).
+        # Choose an appropriate unselected fill depending on current theme.
+        selected_fill = "#1F6AA5"         # blue when selected
+        selected_hover = "#145b84"
+        border_col = "#1F6AA5"
+        # pick a light/dark neutral fill for unselected based on current appearance
+        if getattr(self, "apparence_color_theme", "light") == "dark":
+            unselected_fill = "#2F3336"  # dark gray background for unselected in dark mode
+            unselected_hover = "#3b3f41"
+            unselected_text = "#DCE4EE"
+        else:
+            unselected_fill = "#ECEFF1"  # light gray for unselected in light mode
+            unselected_hover = "#e0e4e8"
+            unselected_text = "gray10"
+
+        # Configure both buttons explicitly (border always visible).
+        common_unselected_cfg = dict(fg_color=unselected_fill, hover_color=unselected_hover,
+                                     text_color=unselected_text, border_width=2, border_color=border_col)
+        common_selected_cfg = dict(fg_color=selected_fill, hover_color=selected_hover,
+                                   text_color="white", border_width=2, border_color=border_col)
+
+        if name == "routines":
+            self.routines_toggle_btn.configure(**common_selected_cfg)
+            self.devices_toggle_btn.configure(**common_unselected_cfg)
+        else:
+            self.devices_toggle_btn.configure(**common_selected_cfg)
+            self.routines_toggle_btn.configure(**common_unselected_cfg)
+
+        # Force immediate repaint: generate a Leave event and update; schedule a tiny delayed refresh
+        try:
+            for btn in (self.devices_toggle_btn, self.routines_toggle_btn):
+                btn.event_generate("<Leave>")
+            self.update_idletasks()
+            # one more short delayed update to ensure CTk internal hover state is cleared
+            self.after(10, lambda: (self.devices_toggle_btn.event_generate("<Leave>"),
+                                    self.routines_toggle_btn.event_generate("<Leave>"),
+                                    self.update_idletasks()))
+        except Exception:
+            pass
     def notification(self, head_message=None, message=None, color=None, path=""):
         """Creates notifications attached to the main window. 
         Also supports visual stacking of notifications

@@ -10,7 +10,12 @@ from ..devices.shutter.shutter import *
 from ..devices.filter import *
 from ..devices.stage import *
 import threading
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from CTkLabel import CTkLabel
 
+# shared headline font for both left panels (slightly larger than other menu text)
+HEADLINE_FONT = ("Arial", 24)
 
 class QuickSetupFrame(CTkScrollableFrame):
     """Class for creating a frame to control all devices"""
@@ -37,12 +42,16 @@ class QuickSetupFrame(CTkScrollableFrame):
         """
         super().__init__(master)
         self.device_entries = []
+        # Headline
+        title = CTkLabel(self, text="Devices", font=HEADLINE_FONT)
+        title.grid(row=0, column=0, padx=20, pady=(12, 6), sticky="w")
+        # enumerate devices, start placing entries at row=1 to leave row 0 for headline
         for i, device in enumerate(microscope.devices):
 
             widgets = []
             master_frame = None
             frame = CTkFrame(self)
-            frame.grid(row=i, column=0, sticky="nsew")
+            frame.grid(row=i+1, column=0, sticky="nsew")
             switch = CTkSwitch(frame, text=device.name, font=("Arial", 20))
             switch.pack(side="left", padx=(30,10), pady=20)
 
@@ -104,7 +113,9 @@ class QuickSetupFrame(CTkScrollableFrame):
             switch.configure(command=lambda e=self.device_entries[-1]: self.toggle_device(e))
 
         self.update_idletasks()
-        self.required_height_for_scrollbar = (i+1) * frame.winfo_height()
+        # account for headline row (+1) when computing required height
+        num_devices = len(microscope.devices)
+        self.required_height_for_scrollbar = (num_devices + 1) * frame.winfo_height()
         self.previous_frame_height = self.master.winfo_height()
         self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
         self.after(200, self.init)
@@ -523,3 +534,59 @@ def update_shutter_button_style(widget, device):
         widget.configure(text="Open", border_color="#009200", hover_color="#004b00")
     else:
         widget.configure(text="Close", border_color="#920000", hover_color="#4b0000")
+
+
+class RoutinesFrame(CTkScrollableFrame):
+    """Secondary left-side menu for routines (placeholder).
+    Extend this class with actual routine controls as needed.
+    """
+    def __init__(self, master, microscope):
+        super().__init__(master)
+        self.microscope = microscope
+        # Minimal placeholder content; replace with your routine widgets
+        label = CTkLabel(self, text="Routines", font=HEADLINE_FONT)
+        label.pack(padx=20, pady=10, anchor="w")
+        # example: list routine buttons (first button renamed)
+        routine_names = ["Polarizer sweep", "Routine 2", "Routine 3"]
+        for i, name in enumerate(routine_names):
+            b = CTkButton(self, text=name, width=200, command=lambda n=i+1: self.run_routine(n))
+            b.pack(padx=20, pady=6, anchor="w")
+
+        # ensure scrollbar visibility matches content like QuickSetupFrame
+        self.update_idletasks()
+        # total required height for content inside this scrollable frame
+        # use requested height of this widget (content) as a simple estimate
+        try:
+            self.required_height_for_scrollbar = self.winfo_reqheight()
+        except Exception:
+            self.required_height_for_scrollbar = 0
+        # track parent height to avoid redundant work
+        try:
+            self.previous_frame_height = self.master.winfo_height()
+        except Exception:
+            self.previous_frame_height = 0
+        # bind parent configure so scrollbar shows/hides on resize
+        try:
+            self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
+        except Exception:
+            pass
+
+    def run_routine(self, n):
+        # placeholder action
+        self.master.notification(f"Started routine {n}")
+
+    def update_scrollbar_visibility(self):
+        """Hide/show the scrollbar depending on available space (same logic as QuickSetupFrame)."""
+        current_height = self.master.winfo_height()
+        if current_height != getattr(self, "previous_frame_height", None):
+            self.previous_frame_height = current_height
+            if getattr(self, "required_height_for_scrollbar", 0) > current_height:
+                try:
+                    self._scrollbar.grid(column=1, row=1, pady=6, sticky="nesw")
+                except Exception:
+                    pass
+            else:
+                try:
+                    self._scrollbar.grid_forget()
+                except Exception:
+                    pass

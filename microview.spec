@@ -28,7 +28,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MicroView(Test)',
+    name='MicroView(Test3)',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
