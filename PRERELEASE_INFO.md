@@ -1,3 +1,12 @@
+v3.0.4
+
+    Added:
+       Polarizer sweep routine
+    
+    Removed:
+
+    Bugs:
+        Sweep data duplication
 v3.0.3
 
     Added:
