@@ -10,9 +10,11 @@ from ..devices.shutter.shutter import *
 from ..devices.filter import *
 from ..devices.stage import *
 import threading
+import time
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from CTkLabel import CTkLabel
+from . import preview
 
 # shared headline font for both left panels (slightly larger than other menu text)
 HEADLINE_FONT = ("Arial", 24)
@@ -537,43 +539,53 @@ def update_shutter_button_style(widget, device):
 
 
 class RoutinesFrame(CTkScrollableFrame):
-    """Secondary left-side menu for routines (placeholder).
-    Extend this class with actual routine controls as needed.
+    """Secondary left-side menu for routines.
+
+    Adds a "Polarizer sweep" routine that opens a multi-page popup. This initial
+    implementation provides page 1 (configure parameters) and a minimal confirmation
+    page. The actual sweep start is a placeholder — it should later call into the
+    appropriate `MyRotationMount.start_sweep` method.
     """
     def __init__(self, master, microscope):
         super().__init__(master)
         self.microscope = microscope
-        # Minimal placeholder content; replace with your routine widgets
-        label = CTkLabel(self, text="Routines", font=HEADLINE_FONT)
-        label.pack(padx=20, pady=10, anchor="w")
-        # example: list routine buttons (first button renamed)
-        routine_names = ["Polarizer sweep", "Routine 2", "Routine 3"]
-        for i, name in enumerate(routine_names):
-            b = CTkButton(self, text=name, width=200, command=lambda n=i+1: self.run_routine(n))
-            b.pack(padx=20, pady=6, anchor="w")
+        self.popup = None
+        self.grid_columnconfigure(0, weight=1)
 
-        # ensure scrollbar visibility matches content like QuickSetupFrame
+        title = CTkLabel(self, text="Routines", font=HEADLINE_FONT)
+        title.grid(row=0, column=0, padx=20, pady=(12, 6), sticky="w")
+
+        # Polarizer sweep routine button
+        self.polarizer_btn = CTkButton(self, text="Polarizer sweep", width=200, command=self.open_polarizer_sweep_popup)
+        self.polarizer_btn.grid(row=1, column=0, padx=20, pady=(8, 6), sticky="w")
+
+        # Additional placeholders for future routines (kept for layout parity)
+        self.other_btn_1 = CTkButton(self, text="Routine 2", width=200, command=lambda: self.run_routine(2))
+        self.other_btn_1.grid(row=2, column=0, padx=20, pady=6, sticky="w")
+        self.other_btn_2 = CTkButton(self, text="Routine 3", width=200, command=lambda: self.run_routine(3))
+        self.other_btn_2.grid(row=3, column=0, padx=20, pady=6, sticky="w")
+
+        # match QuickSetupFrame behavior for scrollbar heuristics
         self.update_idletasks()
-        # total required height for content inside this scrollable frame
-        # use requested height of this widget (content) as a simple estimate
         try:
             self.required_height_for_scrollbar = self.winfo_reqheight()
         except Exception:
             self.required_height_for_scrollbar = 0
-        # track parent height to avoid redundant work
         try:
             self.previous_frame_height = self.master.winfo_height()
         except Exception:
             self.previous_frame_height = 0
-        # bind parent configure so scrollbar shows/hides on resize
         try:
             self.master.bind("<Configure>", lambda event: self.update_scrollbar_visibility())
         except Exception:
             pass
 
     def run_routine(self, n):
-        # placeholder action
-        self.master.notification(f"Started routine {n}")
+        # simple notification for placeholder routines
+        try:
+            self.master.notification(f"Started routine {n}")
+        except Exception:
+            pass
 
     def update_scrollbar_visibility(self):
         """Hide/show the scrollbar depending on available space (same logic as QuickSetupFrame)."""
@@ -590,3 +602,1192 @@ class RoutinesFrame(CTkScrollableFrame):
                     self._scrollbar.grid_forget()
                 except Exception:
                     pass
+
+    # --- Polarizer sweep popup (page 1: configure) ---
+    def open_polarizer_sweep_popup(self):
+        """Open the polarizer sweep configuration popup (page 1).
+
+        Page 1 contains three textboxes: step angle, start angle, stop angle, and
+        a 'Next' button that proceeds to a confirmation page.
+        """
+        if self.popup:
+            try:
+                self.popup.lift()
+            except Exception:
+                pass
+            return
+
+        # ensure a new SweepRoutine container exists for this run (best-effort)
+        try:
+            self._ensure_sweep_routine_folder()
+        except Exception:
+            pass
+
+        # make the popup a child of the main app window so it stays above it
+        self.popup = CTkToplevel(self.master)
+        self.popup.title("Polarizer sweep")
+        self.popup.geometry("420x300")
+        self.popup.resizable(False, False)
+        self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
+        # ensure the popup appears above the main window on open
+        try:
+            self.popup.attributes("-topmost", True)
+            self.popup.transient(self.master)
+            # clear the topmost flag shortly after so modality returns to normal
+            self.after(50, lambda: self.popup.attributes("-topmost", False))
+        except Exception:
+            pass
+
+        self.page_frame = CTkFrame(self.popup)
+        self.page_frame.pack(fill="both", expand=True, padx=16, pady=12)
+
+        # build first page (may be reused when navigating back)
+        self._build_page1()
+        self.popup.focus_force()
+
+    def _build_page1(self, step_val=None, start_val=None, stop_val=None):
+        """Construct page 1: Configure sweep parameters.
+
+        If values are provided, they are inserted into the entries.
+        """
+        # clear any existing content
+        for w in getattr(self, 'page_frame', []).winfo_children():
+            try:
+                w.destroy()
+            except Exception:
+                pass
+
+        headline = CTkLabel(self.page_frame, text="Configure sweep parameters", font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+
+        CTkLabel(self.page_frame, text="Step angle (°):").grid(row=1, column=0, sticky="w", pady=6)
+        self._step_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._step_entry.grid(row=1, column=1, sticky="e", pady=6)
+        if step_val is not None:
+            try:
+                self._step_entry.delete(0, 'end')
+                self._step_entry.insert(0, str(step_val))
+            except Exception:
+                pass
+
+        CTkLabel(self.page_frame, text="Start angle (°):").grid(row=2, column=0, sticky="w", pady=6)
+        self._start_entry = CTkEntry(self.page_frame, width=140, placeholder_text="0")
+        self._start_entry.grid(row=2, column=1, sticky="e", pady=6)
+        if start_val is not None:
+            try:
+                self._start_entry.delete(0, 'end')
+                self._start_entry.insert(0, str(start_val))
+            except Exception:
+                pass
+
+        CTkLabel(self.page_frame, text="Stop angle (°):").grid(row=3, column=0, sticky="w", pady=6)
+        self._stop_entry = CTkEntry(self.page_frame, width=140, placeholder_text="360")
+        self._stop_entry.grid(row=3, column=1, sticky="e", pady=6)
+        if stop_val is not None:
+            try:
+                self._stop_entry.delete(0, 'end')
+                self._stop_entry.insert(0, str(stop_val))
+            except Exception:
+                pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        next_btn = CTkButton(footer, text="Next", width=120, command=self._polarizer_popup_next)
+        next_btn.pack(side="right")
+
+    def _polarizer_popup_next(self):
+        """Validate page 1 values and show a minimal confirmation page (page 2)."""
+        try:
+            step_text = self._step_entry.get().strip() or self._step_entry.placeholder_text or "1"
+            start_text = self._start_entry.get().strip() or self._start_entry.placeholder_text or "0"
+            stop_text = self._stop_entry.get().strip() or self._stop_entry.placeholder_text or "360"
+
+            step = float(step_text)
+            start = float(start_text)
+            stop = float(stop_text)
+        except Exception:
+            try:
+                self.notification("Invalid input", color="#8e0101")
+            except Exception:
+                pass
+            return
+        # clear page and store validated sweep parameters to allow navigation back
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        # store validated sweep parameters to allow navigation back
+        self._pending_sweep_params = (step, start, stop)
+
+        # build second page: Configure data to record
+        headline = CTkLabel(self.page_frame, text="Configure data to record", font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+
+        CTkLabel(self.page_frame, text="Number of dark reference(s):").grid(row=1, column=0, sticky="w", pady=6)
+        self._dark_refs_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._dark_refs_entry.grid(row=1, column=1, sticky="e", pady=6)
+
+        CTkLabel(self.page_frame, text="Number of light reference(s):").grid(row=2, column=0, sticky="w", pady=6)
+        self._light_refs_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._light_refs_entry.grid(row=2, column=1, sticky="e", pady=6)
+
+        CTkLabel(self.page_frame, text="Number of sweeps:").grid(row=3, column=0, sticky="w", pady=6)
+        self._sweeps_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._sweeps_entry.grid(row=3, column=1, sticky="e", pady=6)
+
+        # Footer
+        for child in list(self.popup.winfo_children()):
+            if isinstance(child, CTkFrame) and child is not self.page_frame:
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page2_back)
+        back_btn.pack(side="left")
+        next_btn = CTkButton(footer, text="Next", width=120, command=self._polarizer_page2_next)
+        next_btn.pack(side="right")
+
+    def _polarizer_page2_back(self):
+        """Return from page 2 to page 1, preserving entered sweep parameters."""
+        if not self.popup:
+            return
+        # read stored pending params if available
+        step = start = stop = None
+        if hasattr(self, '_pending_sweep_params') and self._pending_sweep_params:
+            try:
+                step, start, stop = self._pending_sweep_params
+            except Exception:
+                step = start = stop = None
+
+        # remove any extra footer frames
+        try:
+            for child in list(self.popup.winfo_children()):
+                if isinstance(child, CTkFrame) and child is not self.page_frame:
+                    try:
+                        child.destroy()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # clear page and rebuild page1 with preserved values
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        self._build_page1(step, start, stop)
+
+    def _polarizer_page2_next(self):
+        """Validate data entries on page 2 and start the sweep using the first available rotation mount.
+
+        Saves the entered dark/light reference counts and sweeps into `self._pending_data_config`.
+        Attempts to find a `MyRotationMount` in the currently selected microscope and calls
+        its `start_sweep` method. If none is found, shows a notification.
+        """
+        # Validate integer inputs
+        try:
+            dark_count = int(self._dark_refs_entry.get() or self._dark_refs_entry.placeholder_text)
+            light_count = int(self._light_refs_entry.get() or self._light_refs_entry.placeholder_text)
+            sweeps_count = int(self._sweeps_entry.get() or self._sweeps_entry.placeholder_text)
+            if dark_count < 0 or light_count < 0 or sweeps_count <= 0:
+                raise ValueError("Counts must be positive")
+        except Exception:
+            try:
+                self.notification("Invalid data configuration", color="#8e0101")
+            except Exception:
+                pass
+            return
+
+        # store pending data config and navigate to the dark-reference recording page
+        self._pending_data_config = {'dark_refs': dark_count, 'light_refs': light_count, 'sweeps': sweeps_count}
+
+        # ensure sweep parameters exist
+        if not hasattr(self, '_pending_sweep_params') or not self._pending_sweep_params:
+            try:
+                self.notification("Sweep parameters missing", color="#8e0101")
+            except Exception:
+                pass
+            # navigate back to page 1
+            self._polarizer_page2_back()
+            return
+
+        # Build page 3: Record dark references
+        self._build_page3()
+
+    def _build_page3(self):
+        """Page 3: Record dark reference(s).
+
+        Shows headline "Record dark reference(s)", a centered button to record the dark
+        references and footer with Back and Next (Next disabled until recording completes).
+        """
+        # clear page
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        headline = CTkLabel(self.page_frame, text="Record dark reference(s)", font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=3, sticky="n", pady=(8, 12))
+
+        # centered record button
+        self._record_button = CTkButton(self.page_frame, text="Record dark reference(s)", width=220, command=self._record_dark_refs)
+        self._record_button.grid(row=1, column=0, columnspan=3, pady=(20, 6))
+
+        # status label
+        self._record_status_label = CTkLabel(self.page_frame, text="Not recorded", font=("Arial", 12), text_color="grey")
+        self._record_status_label.grid(row=2, column=0, columnspan=3, pady=(6, 6))
+
+        # Footer: Back + Next (Next disabled until recorded)
+        for child in list(self.popup.winfo_children()):
+            if isinstance(child, CTkFrame) and child is not self.page_frame:
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page3_back)
+        back_btn.pack(side="left")
+        self._page3_next_btn = CTkButton(footer, text="Next", width=120, state="disabled", command=self._polarizer_page3_next)
+        self._page3_next_btn.pack(side="right")
+
+    def _polarizer_page3_back(self):
+        """Return from page 3 to page 2, preserving data config entries."""
+        # rebuild page2 with previous entries
+        if not self.popup:
+            return
+        try:
+            # clear footers
+            for child in list(self.popup.winfo_children()):
+                if isinstance(child, CTkFrame) and child is not self.page_frame:
+                    try:
+                        child.destroy()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # rebuild page2 UI with preserved entries
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        # reuse values from _pending_data_config if available
+        dark = light = sweeps = None
+        if hasattr(self, '_pending_data_config') and self._pending_data_config:
+            try:
+                dark = self._pending_data_config.get('dark_refs')
+                light = self._pending_data_config.get('light_refs')
+                sweeps = self._pending_data_config.get('sweeps')
+            except Exception:
+                dark = light = sweeps = None
+
+        # rebuild page2 content
+        headline = CTkLabel(self.page_frame, text="Configure data to record", font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+
+        CTkLabel(self.page_frame, text="Number of dark reference(s):").grid(row=1, column=0, sticky="w", pady=6)
+        self._dark_refs_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._dark_refs_entry.grid(row=1, column=1, sticky="e", pady=6)
+        if dark is not None:
+            try:
+                self._dark_refs_entry.delete(0, 'end')
+                self._dark_refs_entry.insert(0, str(dark))
+            except Exception:
+                pass
+
+        CTkLabel(self.page_frame, text="Number of light reference(s):").grid(row=2, column=0, sticky="w", pady=6)
+        self._light_refs_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._light_refs_entry.grid(row=2, column=1, sticky="e", pady=6)
+        if light is not None:
+            try:
+                self._light_refs_entry.delete(0, 'end')
+                self._light_refs_entry.insert(0, str(light))
+            except Exception:
+                pass
+
+        CTkLabel(self.page_frame, text="Number of sweeps:").grid(row=3, column=0, sticky="w", pady=6)
+        self._sweeps_entry = CTkEntry(self.page_frame, width=140, placeholder_text="1")
+        self._sweeps_entry.grid(row=3, column=1, sticky="e", pady=6)
+        if sweeps is not None:
+            try:
+                self._sweeps_entry.delete(0, 'end')
+                self._sweeps_entry.insert(0, str(sweeps))
+            except Exception:
+                pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page2_back)
+        back_btn.pack(side="left")
+        next_btn = CTkButton(footer, text="Next", width=120, command=self._polarizer_page2_next)
+        next_btn.pack(side="right")
+
+    def _record_dark_refs(self):
+        """Record dark references the requested number of times in a background thread.
+
+        Enables the Next button on completion.
+        """
+        # Prefer the value stored in pending config (from page2). Fallback to entry if present.
+        try:
+            if hasattr(self, '_pending_data_config') and self._pending_data_config:
+                count = int(self._pending_data_config.get('dark_refs', 1))
+            else:
+                count = int(self._dark_refs_entry.get() or self._dark_refs_entry.placeholder_text)
+        except Exception:
+            count = 1
+        
+
+        # Reset per-run counters so repeated runs don't accumulate state
+        try:
+            self._light_recorded = 0
+            self._sample_recorded = 0
+        except Exception:
+            pass
+
+        debugp("Routines", f"Starting dark reference recording x{count}")
+
+        # Best-effort: close any KST201 shutters on the microscope before recording dark references.
+        closed_shutters = []
+        try:
+            # prefer explicit microscope reference passed into the frame
+            microscope = getattr(self, 'microscope', None) or getattr(self.master, 'selected_microscope', None)
+            if microscope and hasattr(microscope, 'devices'):
+                for dev in microscope.devices:
+                    try:
+                        # target MyShutter wrappers backed by KST201 devices specifically
+                        if isinstance(dev, MyShutter) and getattr(dev, 'model', None) == 'KST201':
+                            try:
+                                dev.close()
+                                closed_shutters.append(dev)
+                                debugp("Routines", f"Closed KST201 shutter: {dev}")
+                            except Exception as e:
+                                debugp("Routines", f"Failed to close KST201 shutter {dev}: {e}")
+                    except Exception:
+                        # ignore devices that don't match
+                        pass
+        except Exception as e:
+            debugp("Routines", f"Error while closing shutters: {e}")
+
+        # disable record button and update status
+        try:
+            self._record_button.configure(state="disabled", text="Recording...")
+            self._record_status_label.configure(text=f"Recording 0/{count}")
+        except Exception:
+            pass
+
+        def _worker():
+            # aggregated saved directories across all iterations
+            saved_dirs = []
+            recorded = 0
+
+            for i in range(count):
+                try:
+                    # locate spectrometer_frame in case widget hierarchy differs
+                    spec_frame = None
+                    try:
+                        if hasattr(self.master, 'spectrometer_frame') and getattr(self.master, 'spectrometer_frame'):
+                            spec_frame = self.master.spectrometer_frame
+                        elif hasattr(self.master, 'master') and hasattr(self.master.master, 'spectrometer_frame') and getattr(self.master.master, 'spectrometer_frame'):
+                            spec_frame = self.master.master.spectrometer_frame
+                        elif hasattr(self.master, 'master') and hasattr(self.master.master, 'master') and hasattr(self.master.master.master, 'spectrometer_frame'):
+                            spec_frame = self.master.master.master.spectrometer_frame
+                    except Exception:
+                        spec_frame = None
+
+                    if not spec_frame:
+                        # fallback: notify and break (call app notification directly)
+                        try:
+                            self.master.notification("No spectrometer available", None, "#8e0101")
+                        except Exception:
+                            pass
+                        break
+
+                    # Ensure spectrometer is running so chart_queue has data
+                    try:
+                        if spec_frame.connected_spectrometers and not spec_frame.connected_spectrometers[0].is_running:
+                            spec_frame.start_spectrometer(spec_frame.connected_spectrometers[0])
+                    except Exception:
+                        pass
+
+                    # request dark reference; allow spectrometer_frame to show its per-file notification
+                    try:
+                        # enable per-iteration notifications so the user sees confirmation for each saved dark reference
+                        result = spec_frame.set_dark_reference(display_notification=True)
+                    except Exception as e:
+                        debugp("Routines", f"set_dark_reference error: {e}")
+                        result = None
+
+                    # wait for spectrometer saving to finish (best-effort)
+                    try:
+                        wait_spec = None
+                        if spec_frame and getattr(spec_frame, 'connected_spectrometers', None):
+                            wait_spec = spec_frame.connected_spectrometers[0]
+                    except Exception:
+                        wait_spec = None
+
+                    start_time_local = time.time()
+                    timeout_local = 60 * 2  # 2 minutes per dark reference
+                    while True:
+                        try:
+                            if wait_spec is None or getattr(wait_spec, 'acquire_save_data', 0) == 0:
+                                break
+                        except Exception:
+                            break
+                        if time.time() - start_time_local > timeout_local:
+                            debugp("Routines", f"Dark reference save timed out for iteration {i+1}")
+                            break
+                        time.sleep(0.2)
+
+                    # consider this iteration successful (increment) even if result is None but wait finished;
+                    # aggregate returned saved dirs if any
+                    try:
+                        if result:
+                            # result may be a list of saved directories (one per spectrometer)
+                            if isinstance(result, (list, tuple)):
+                                saved_dirs.extend(result)
+                            else:
+                                saved_dirs.append(result)
+                    except Exception:
+                        # ignore aggregation errors
+                        pass
+
+                    # increment recorded count now that save/wait is done
+                    recorded += 1
+
+                except Exception as e:
+                    debugp("Routines", f"Error recording dark reference: {e}")
+                finally:
+                    # update status label from main thread
+                    def _update_status(r=recorded):
+                        try:
+                            self._record_status_label.configure(text=f"Recorded {r}/{count}")
+                        except Exception:
+                            pass
+                    self.after(0, _update_status)
+                    time.sleep(0.3)
+
+            # enable Next button on completion
+            def _on_done():
+                try:
+                    self._record_button.configure(state="normal", text="Record dark reference(s)")
+                except Exception:
+                    pass
+                try:
+                    self._page3_next_btn.configure(state="normal")
+                    self._record_status_label.configure(text=f"Recorded {recorded}/{count}")
+                except Exception:
+                    pass
+                # Re-open any shutters we closed before recording (best-effort)
+                try:
+                    for sh in closed_shutters:
+                        try:
+                            if hasattr(sh, 'open'):
+                                sh.open()
+                        except Exception as e:
+                            debugp("Routines", f"Failed to reopen shutter {sh}: {e}")
+                except Exception:
+                    pass
+
+                # Single end-of-process notification (include folder if available)
+                try:
+                    folder_msg = None
+                    if saved_dirs:
+                        # prefer first directory
+                        folder_msg = saved_dirs[0]
+                    if recorded > 0:
+                        try:
+                            if folder_msg:
+                                # call application notification directly: head_message, message, color
+                                self.master.notification(f"Recorded {recorded} dark reference(s)", f"Saved to: {folder_msg}", "#1a8300")
+                            else:
+                                self.master.notification(f"Recorded {recorded} dark reference(s)", None, "#1a8300")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            self.after(0, _on_done)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _polarizer_page3_next(self):
+        """Proceed to the light-reference recording page after dark refs are done."""
+        # Build page 4 (light references)
+        self._build_page4()
+
+    def _build_page4(self):
+        """Page 4: Record light reference(s). Similar to page 3."""
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        headline = CTkLabel(self.page_frame, text="Record light reference(s)", font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=3, sticky="n", pady=(8, 12))
+        # Instruction text for light reference sweeps
+        try:
+            total_light_refs = int(self._pending_data_config.get('light_refs', 1)) if hasattr(self, '_pending_data_config') and self._pending_data_config else 1
+        except Exception:
+            total_light_refs = 1
+
+        instruct = CTkLabel(self.page_frame, text=f"Move sample to a blank (reference) surface and record {total_light_refs} light reference sweep(s).\nYou will trigger each sweep manually by clicking the button below.", font=("Arial", 12), text_color="white", justify="center")
+        instruct.grid(row=1, column=0, columnspan=3, pady=(6, 12))
+
+        # centered record button. Button text is dynamic to indicate which reference will be recorded next.
+        self._light_total = total_light_refs
+        self._light_recorded = getattr(self, '_light_recorded', 0)
+        btn_text = f"Record light reference {self._light_recorded + 1}" if self._light_recorded < self._light_total else "Record light reference"
+        self._record_light_button = CTkButton(self.page_frame, text=btn_text, width=280, command=self._record_light_refs)
+        self._record_light_button.grid(row=2, column=0, columnspan=3, pady=(6, 6))
+
+        # status label
+        self._record_light_status_label = CTkLabel(self.page_frame, text=f"Recorded {self._light_recorded}/{self._light_total}", font=("Arial", 12), text_color="grey")
+        self._record_light_status_label.grid(row=3, column=0, columnspan=3, pady=(6, 6))
+
+        # Footer: Back + Next (Next disabled until recorded)
+        for child in list(self.popup.winfo_children()):
+            if isinstance(child, CTkFrame) and child is not self.page_frame:
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page4_back)
+        back_btn.pack(side="left")
+        self._page4_next_btn = CTkButton(footer, text="Next", width=120, state="disabled", command=self._polarizer_page4_next)
+        self._page4_next_btn.pack(side="right")
+
+    def _polarizer_page4_back(self):
+        """Return from page 4 to page 3."""
+        # rebuild page3
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+        self._build_page3()
+
+    def _build_page5(self):
+        """Page 5: Sample sweeps. User triggers each sweep manually; Finish button closes popup."""
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        # total sample sweeps
+        try:
+            total = int(self._pending_data_config.get('sweeps', 1)) if hasattr(self, '_pending_data_config') and self._pending_data_config else 1
+        except Exception:
+            total = 1
+
+        self._sample_total = total
+        self._sample_recorded = getattr(self, '_sample_recorded', 0)
+
+        # Instruction text: first vs subsequent
+        if self._sample_recorded == 0:
+            instruct_text = "Align with structure to sweep and click the button below"
+        else:
+            instruct_text = "Move and align with the next structure to sweep and click the button below"
+
+        instruct = CTkLabel(self.page_frame, text=instruct_text, font=("Arial", 12), text_color="white", justify="center")
+        instruct.grid(row=0, column=0, columnspan=3, pady=(8, 12))
+
+        # dynamic record button
+        btn_text = f"Record sweep {self._sample_recorded + 1}" if self._sample_recorded < self._sample_total else "Record sweep"
+        self._record_sample_button = CTkButton(self.page_frame, text=btn_text, width=280, command=self._record_sample_sweep)
+        self._record_sample_button.grid(row=1, column=0, columnspan=3, pady=(6, 6))
+
+        # status label
+        self._record_sample_status_label = CTkLabel(self.page_frame, text=f"Recorded {self._sample_recorded}/{self._sample_total}", font=("Arial", 12), text_color="grey")
+        self._record_sample_status_label.grid(row=2, column=0, columnspan=3, pady=(6, 6))
+
+        # Footer: Back + Finish (Finish disabled until done)
+        for child in list(self.popup.winfo_children()):
+            if isinstance(child, CTkFrame) and child is not self.page_frame:
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page5_back)
+        back_btn.pack(side="left")
+        self._finish_btn = CTkButton(footer, text="Finish", width=120, state="disabled", command=self._polarizer_page5_finish)
+        self._finish_btn.pack(side="right")
+
+    def _polarizer_page5_back(self):
+        """Go back to light reference page."""
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+        # preserve state and go back to page4 UI
+        self._build_page4()
+
+
+    def _build_page5(self):
+        """Page 5: Sample sweeps. User triggers each sweep manually; Finish button closes popup."""
+        try:
+            for w in self.page_frame.winfo_children():
+                w.destroy()
+        except Exception:
+            pass
+
+        # total sample sweeps
+        try:
+            total = int(self._pending_data_config.get('sweeps', 1)) if hasattr(self, '_pending_data_config') and self._pending_data_config else 1
+        except Exception:
+            total = 1
+
+        self._sample_total = total
+        self._sample_recorded = getattr(self, '_sample_recorded', 0)
+
+        # Instruction text: first vs subsequent
+        if self._sample_recorded == 0:
+            instruct_text = "Align with structure to sweep and click the button below"
+        else:
+            instruct_text = "Move and align with the next structure to sweep and click the button below"
+
+        instruct = CTkLabel(self.page_frame, text=instruct_text, font=("Arial", 12), text_color="white", justify="center")
+        instruct.grid(row=0, column=0, columnspan=3, pady=(8, 12))
+
+        # dynamic record button
+        btn_text = f"Record sweep {self._sample_recorded + 1}" if self._sample_recorded < self._sample_total else "Record sweep"
+        self._record_sample_button = CTkButton(self.page_frame, text=btn_text, width=280, command=self._record_sample_sweep)
+        self._record_sample_button.grid(row=1, column=0, columnspan=3, pady=(6, 6))
+
+        # status label
+        self._record_sample_status_label = CTkLabel(self.page_frame, text=f"Recorded {self._sample_recorded}/{self._sample_total}", font=("Arial", 12), text_color="grey")
+        self._record_sample_status_label.grid(row=2, column=0, columnspan=3, pady=(6, 6))
+
+        # Footer: Back + Finish (Finish disabled until done)
+        for child in list(self.popup.winfo_children()):
+            if isinstance(child, CTkFrame) and child is not self.page_frame:
+                try:
+                    child.destroy()
+                except Exception:
+                    pass
+
+        footer = CTkFrame(self.popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+        back_btn = CTkButton(footer, text="Back", width=120, command=self._polarizer_page5_back)
+        back_btn.pack(side="left")
+        self._finish_btn = CTkButton(footer, text="Finish", width=120, state="disabled", command=self._polarizer_page5_finish)
+        self._finish_btn.pack(side="right")
+
+    def _polarizer_page5_finish(self):
+        """Finish the routine and close the popup."""
+        try:
+            # Run preview generation in background using the active SweepRoutine folder (best-effort)
+            try:
+                fs = self._get_filesystem()
+                if fs and getattr(fs, "current_sweep_routine", None):
+                    sweep_root = os.path.join(fs.backup_directory, fs.current_sweep_routine)
+                    def _run_preview_and_notify(root, app_master=self.master):
+                        try:
+                            out = preview.generate_preview_from_sweep(root)
+                            # notify on main thread if possible
+                            try:
+                                app_master.notification("Preview ready", f"Saved to: {out}", "#1a8300")
+                            except Exception:
+                                pass
+                        except Exception as e:
+                            try:
+                                app_master.notification("Preview failed", str(e), "#e17e00")
+                            except Exception:
+                                pass
+                    threading.Thread(target=_run_preview_and_notify, args=(sweep_root,), daemon=True).start()
+            except Exception:
+                pass
+
+            # teardown sweep routine so subsequent runs create a new SweepRoutineN folder
+            try:
+                self._teardown_sweep_routine()
+            except Exception:
+                pass
+
+            if self.popup:
+                self.popup.destroy()
+        except Exception:
+            pass
+        self.popup = None
+
+    def _record_sample_sweep(self):
+        """Record a single sample sweep (user-triggered)."""
+        total = getattr(self, '_sample_total', 1)
+        recorded = getattr(self, '_sample_recorded', 0)
+
+        # disable button and update status
+        try:
+            self._record_sample_button.configure(state="disabled", text=f"Recording {recorded + 1}/{total}...")
+            self._record_sample_status_label.configure(text=f"Recording {recorded}/{total}")
+        except Exception:
+            pass
+
+        def _worker():
+            nonlocal recorded, total
+
+            # find rotation mount
+            rotation_mount = None
+            try:
+                microscope = getattr(self, 'microscope', None) or getattr(self.master, 'selected_microscope', None)
+                if microscope:
+                    for dev in microscope.devices:
+                        if isinstance(dev, MyRotationMount):
+                            rotation_mount = dev
+                            break
+            except Exception:
+                rotation_mount = None
+
+            if rotation_mount is None:
+                try:
+                    self.master.notification("No rotation mount found", None, "#8e0101")
+                except Exception:
+                    pass
+                def _reenable():
+                    try:
+                        self._record_sample_button.configure(state="normal", text=f"Record sweep {recorded + 1}")
+                    except Exception:
+                        pass
+                self.after(0, _reenable)
+                return
+
+            # Ensure spectrometer running
+            try:
+                spec_frame = getattr(self.master, 'spectrometer_frame', None)
+            except Exception:
+                spec_frame = None
+            try:
+                if spec_frame and spec_frame.connected_spectrometers and not spec_frame.connected_spectrometers[0].is_running:
+                    spec_frame.start_spectrometer(spec_frame.connected_spectrometers[0])
+            except Exception:
+                pass
+
+            # Set folder name for this sweep
+            idx = recorded + 1
+            sweep_folder = f"Sweep_{idx}"
+            try:
+                rotation_mount.sweep_folder_name = sweep_folder
+            except Exception:
+                pass
+
+            # start sweep
+            try:
+                rotation_mount.start_sweep(int(self._pending_sweep_params[0]), start_angle=int(self._pending_sweep_params[1]), stop_angle=int(self._pending_sweep_params[2]))
+            except Exception as e:
+                debugp("Routines", f"Failed to start sample sweep: {e}")
+                try:
+                    self.master.notification("Failed to start sweep", None, "#8e0101")
+                except Exception:
+                    pass
+                def _reenable_err():
+                    try:
+                        self._record_sample_button.configure(state="normal", text=f"Record sweep {recorded + 1}")
+                    except Exception:
+                        pass
+                self.after(0, _reenable_err)
+                return
+
+            # wait for completion
+            wait_spec = getattr(rotation_mount, 'spectrometer', None)
+            if wait_spec is None and spec_frame and spec_frame.connected_spectrometers:
+                wait_spec = spec_frame.connected_spectrometers[0]
+
+            timeout = 60 * 10
+            start_time = time.time()
+            while True:
+                try:
+                    if wait_spec is None or getattr(wait_spec, 'acquire_save_data', 0) == 0:
+                        break
+                except Exception:
+                    break
+                if time.time() - start_time > timeout:
+                    try:
+                        self.master.notification(f"Sweep timed out", None, "#e17e00")
+                    except Exception:
+                        pass
+                    break
+                time.sleep(0.5)
+
+            # determine folder
+            folder = None
+            try:
+                if spec_frame and spec_frame.connected_spectrometers:
+                    spec = spec_frame.connected_spectrometers[0]
+                    file_path = spec_frame.file_system.get_spectrometer_directory(spec.integration_time, spec.name, rotation_mount.sweep_folder_name)
+                    folder = os.path.dirname(file_path)
+            except Exception:
+                folder = None
+
+            # update UI
+            def _on_done():
+                try:
+                    self._sample_recorded = recorded + 1
+                    rec = self._sample_recorded
+                    self._record_sample_status_label.configure(text=f"Recorded {rec}/{total}")
+                    # notify per sweep
+                    try:
+                        if folder:
+                            self.master.notification(f"Sweep {idx} recorded", f"Saved to: {folder}", "#1a8300")
+                        else:
+                            self.master.notification(f"Sweep {idx} recorded", None, "#1a8300")
+                    except Exception:
+                        pass
+                    if rec >= total:
+                        try:
+                            self._finish_btn.configure(state="normal")
+                        except Exception:
+                            pass
+                        try:
+                            self._record_sample_button.configure(state="disabled", text="All recorded")
+                        except Exception:
+                            pass
+                    else:
+                        # update instruction text and button
+                        try:
+                            # replace instruction text
+                            for child in self.page_frame.winfo_children():
+                                if isinstance(child, CTkLabel) and child is not None:
+                                    # first label is instruction
+                                    child.configure(text="Move and align with the next structure to sweep and click the button below")
+                                    break
+                        except Exception:
+                            pass
+                        try:
+                            self._record_sample_button.configure(state="normal", text=f"Record sweep {rec + 1}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            self.after(0, _on_done)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _record_light_refs(self):
+        """Record light references in background thread and enable Next when done."""
+        # Determine target count and current progress
+        try:
+            total = int(self._pending_data_config.get('light_refs', 1)) if hasattr(self, '_pending_data_config') and self._pending_data_config else int(self._light_refs_entry.get() or self._light_refs_entry.placeholder_text)
+        except Exception:
+            total = 1
+
+        # Disable immediate re-click and start background worker for a single sweep
+        try:
+            self._record_light_button.configure(state="disabled", text=f"Recording {self._light_recorded + 1}/{total}...")
+            self._record_light_status_label.configure(text=f"Recording {self._light_recorded}/{total}")
+        except Exception:
+            pass
+
+        def _worker():
+            nonlocal total
+            idx = self._light_recorded + 1
+            # find rotation mount
+            rotation_mount = None
+            try:
+                microscope = getattr(self, 'microscope', None) or getattr(self.master, 'selected_microscope', None)
+                if microscope:
+                    for dev in microscope.devices:
+                        if isinstance(dev, MyRotationMount):
+                            rotation_mount = dev
+                            break
+            except Exception:
+                rotation_mount = None
+
+            if rotation_mount is None:
+                try:
+                    self.master.notification("No rotation mount found", None, "#8e0101")
+                except Exception:
+                    pass
+                # re-enable button
+                def _reenable():
+                    try:
+                        self._record_light_button.configure(state="normal", text=f"Record light reference {self._light_recorded + 1}")
+                    except Exception:
+                        pass
+                self.after(0, _reenable)
+                return
+
+            # Ensure spectrometer is running
+            try:
+                spec_frame = getattr(self.master, 'spectrometer_frame', None)
+            except Exception:
+                spec_frame = None
+            try:
+                if spec_frame and spec_frame.connected_spectrometers and not spec_frame.connected_spectrometers[0].is_running:
+                    spec_frame.start_spectrometer(spec_frame.connected_spectrometers[0])
+            except Exception:
+                pass
+
+            # Set folder name for this light reference and start sweep
+            sweep_folder = f"LightRef_{idx}"
+            try:
+                rotation_mount.sweep_folder_name = sweep_folder
+            except Exception:
+                pass
+
+            try:
+                rotation_mount.start_sweep(int(self._pending_sweep_params[0]), start_angle=int(self._pending_sweep_params[1]), stop_angle=int(self._pending_sweep_params[2]))
+            except Exception as e:
+                debugp("Routines", f"Failed to start light reference sweep: {e}")
+                try:
+                    self.master.notification("Failed to start light reference sweep", None, "#8e0101")
+                except Exception:
+                    pass
+                # re-enable button
+                def _reenable_err():
+                    try:
+                        self._record_light_button.configure(state="normal", text=f"Record light reference {self._light_recorded + 1}")
+                    except Exception:
+                        pass
+                self.after(0, _reenable_err)
+                return
+
+            # Wait for sweep completion by polling spectrometer acquire flag
+            wait_spec = getattr(rotation_mount, 'spectrometer', None)
+            if wait_spec is None and spec_frame and spec_frame.connected_spectrometers:
+                wait_spec = spec_frame.connected_spectrometers[0]
+
+            timeout = 60 * 10
+            start_time = time.time()
+            while True:
+                try:
+                    if wait_spec is None or getattr(wait_spec, 'acquire_save_data', 0) == 0:
+                        break
+                except Exception:
+                    break
+                if time.time() - start_time > timeout:
+                    try:
+                        self.master.notification(f"Light reference sweep timed out", None, "#e17e00")
+                    except Exception:
+                        pass
+                    break
+                time.sleep(0.5)
+
+            # After completion, compute the folder where files were written
+            folder = None
+            try:
+                if spec_frame and spec_frame.connected_spectrometers:
+                    spec = spec_frame.connected_spectrometers[0]
+                    file_path = spec_frame.file_system.get_spectrometer_directory(spec.integration_time, spec.name, rotation_mount.sweep_folder_name)
+                    folder = os.path.dirname(file_path)
+            except Exception:
+                folder = None
+
+            # update recorded counter and UI from main thread
+            def _on_done():
+                try:
+                    self._light_recorded += 1
+                    recorded = self._light_recorded
+                    self._record_light_status_label.configure(text=f"Recorded {recorded}/{total}")
+                    # show per-light-reference notification with folder
+                    try:
+                        if folder:
+                            self.master.notification(f"Light reference {idx} recorded", f"Saved to: {folder}", "#1a8300")
+                        else:
+                            self.master.notification(f"Light reference {idx} recorded", None, "#1a8300")
+                    except Exception:
+                        pass
+                    if recorded >= total:
+                        try:
+                            self._page4_next_btn.configure(state="normal")
+                        except Exception:
+                            pass
+                        try:
+                            self._record_light_button.configure(state="disabled", text="All recorded")
+                        except Exception:
+                            pass
+                    else:
+                        # update button text for next reference
+                        try:
+                            self._record_light_button.configure(state="normal", text=f"Record light reference {recorded + 1}")
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            self.after(0, _on_done)
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _polarizer_page4_next(self):
+        """Proceed to the sample sweep page where the user records each sweep manually.
+
+        The sample sweep page provides a dynamic button to record each sweep one-byone
+        (user aligns between sweeps). When all sweeps are recorded the Finish button is enabled.
+        """
+        # Validate pending configuration
+        if not hasattr(self, '_pending_sweep_params') or not self._pending_sweep_params:
+            try:
+                self.notification("Sweep parameters missing", color="#8e0101")
+            except Exception:
+                pass
+            return
+
+        if not hasattr(self, '_pending_data_config') or not self._pending_data_config:
+            try:
+                self.notification("Data configuration missing", color="#8e0101")
+            except Exception:
+                pass
+            return
+
+        # Build the sample sweep page (page 5)
+        self._build_page5()
+
+    def _polarizer_popup_back(self):
+        # Rebuild the initial page by destroying and reopening popup
+        if self.popup:
+            try:
+                self.popup.destroy()
+            except Exception:
+                pass
+        self.popup = None
+        self.open_polarizer_sweep_popup()
+
+    def _polarizer_start(self, step, start, stop):
+        # Placeholder action: notify and close. Integration with rotation mount will be added later.
+        try:
+            self.notification("Sweep started", f"{start}° → {stop}° step {step}°", "#1a8300")
+        except Exception:
+            pass
+        if self.popup:
+            try:
+                self.popup.destroy()
+            except Exception:
+                pass
+        # cleanup sweep routine state so next run creates a new folder
+        try:
+            self._teardown_sweep_routine()
+        except Exception:
+            pass
+        self.popup = None
+
+    def close_popup(self):
+        if self.popup:
+            try:
+                self.popup.destroy()
+            except Exception:
+                pass
+            self.popup = None
+        # popup closed/cancelled -> clear active sweep routine so next run makes a new folder
+        try:
+            self._teardown_sweep_routine()
+        except Exception:
+            pass
+
+    def _ensure_sweep_routine_folder(self):
+        """Best-effort locate a FileSystem instance and call start_new_sweep_routine once."""
+        # avoid repeated creation if popup reopened
+        if getattr(self, "_sweep_routine_started", False):
+            return
+        fs = None
+
+        # check direct microscope object passed to this frame
+        try:
+            if getattr(self, "microscope", None) and hasattr(self.microscope, "file_system"):
+                fs = self.microscope.file_system
+        except Exception:
+            fs = None
+
+        # walk up the master chain to find file_system (common app placements)
+        node = self.master
+        for _ in range(6):  # search a few levels
+            if not node:
+                break
+            if hasattr(node, "file_system"):
+                fs = getattr(node, "file_system")
+                break
+            # also check spectrometer_frame which often holds file_system
+            if hasattr(node, "spectrometer_frame") and getattr(node, "spectrometer_frame", None) and hasattr(node.spectrometer_frame, "file_system"):
+                fs = node.spectrometer_frame.file_system
+                break
+            node = getattr(node, "master", None)
+
+        # final attempt: spectrometer_frame directly on known locations
+        try:
+            if not fs and hasattr(self.master, "spectrometer_frame") and getattr(self.master, "spectrometer_frame"):
+                fs = self.master.spectrometer_frame.file_system
+        except Exception:
+            pass
+
+        if fs and hasattr(fs, "start_new_sweep_routine"):
+            try:
+                fs.start_new_sweep_routine()
+                self._sweep_routine_started = True
+            except Exception:
+                pass
+
+    def _get_filesystem(self):
+        """Best-effort: locate and return the FileSystem instance used by the app (or None)."""
+        fs = None
+        try:
+            if getattr(self, "microscope", None) and hasattr(self.microscope, "file_system"):
+                return self.microscope.file_system
+        except Exception:
+            pass
+
+        node = self.master
+        for _ in range(6):
+            if not node:
+                break
+            if hasattr(node, "file_system"):
+                return getattr(node, "file_system")
+            if hasattr(node, "spectrometer_frame") and getattr(node, "spectrometer_frame", None) and hasattr(node.spectrometer_frame, "file_system"):
+                return node.spectrometer_frame.file_system
+            node = getattr(node, "master", None)
+
+        try:
+            if hasattr(self.master, "spectrometer_frame") and getattr(self.master, "spectrometer_frame", None):
+                return self.master.spectrometer_frame.file_system
+        except Exception:
+            pass
+
+        return None
+
+    def _teardown_sweep_routine(self):
+        """Clear the active sweep routine marker (both on this frame and on FileSystem) so the next run creates a new folder."""
+        # reset frame flag first
+        try:
+            self._sweep_routine_started = False
+        except Exception:
+            pass
+
+        fs = None
+        try:
+            fs = self._get_filesystem()
+        except Exception:
+            fs = None
+
+        if fs:
+            try:
+                # perform cleanup: remove the SweepRoutineN folder if it contains no files
+                if hasattr(fs, "cleanup_current_sweep_routine"):
+                    try:
+                        fs.cleanup_current_sweep_routine()
+                    except Exception as e:
+                        debugp("Routines", f"cleanup_current_sweep_routine failed: {e}")
+                else:
+                    # fallback: unset the marker
+                    fs.current_sweep_routine = None
+                    fs.current_sweep_has_data = False
+                    debugp("Routines", "Cleared FileSystem.current_sweep_routine (fallback)")
+            except Exception as e:
+                debugp("Routines", f"Failed to clear sweep routine on filesystem: {e}")

@@ -1,4 +1,9 @@
 # Changelog
+## [3.0.4] - 2026-01-10
+### <span style="color:green"> Added </span>
+- Dev : Polarizer sweep routine added
+
+
 
 ## [3.0.3] - 2025-11-11
 ### <span style="color:green"> Added </span>

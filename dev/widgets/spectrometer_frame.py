@@ -9,6 +9,8 @@ import threading
 import numpy
 import time
 import csv
+import os
+import queue
 from copy import deepcopy
 from CTkToolTip import *
 
@@ -450,13 +452,26 @@ class SpectrometerFrame(CTkFrame):
 
     
     def single_save(self, file_path, wavelengths, intensities, single_save, reference, index, display_notification=True):    
-        local_wavelengths, local_intensities = self.connected_spectrometers[index].chart_queue.get()
-        wavelengths_to_write = wavelengths if wavelengths is not None else local_wavelengths
-        intensities_to_write = intensities if intensities is not None else local_intensities
+        # Only pull from the spectrometer chart queue if caller did not provide arrays.
+        if wavelengths is None or intensities is None:
+            try:
+                local_wavelengths, local_intensities = self.connected_spectrometers[index].chart_queue.get()
+            except Exception:
+                self.notification(f"No data to save", color="#8e0101")
+                return
+            wavelengths_to_write = local_wavelengths
+            intensities_to_write = local_intensities
+        else:
+            wavelengths_to_write = wavelengths
+            intensities_to_write = intensities
         if wavelengths_to_write is not None and intensities_to_write is not None:
             
             if file_path:
                 try:
+                    # ensure directory exists
+                    directory = os.path.dirname(file_path)
+                    if directory:
+                        os.makedirs(directory, exist_ok=True)
                     with open(file_path, mode='w', newline='') as file:
                         writer = csv.writer(file)
                         writer.writerow(['Wavelength [nm]', ' Intensity [counts]'])
@@ -754,41 +769,80 @@ class SpectrometerFrame(CTkFrame):
     def set_light_reference(self):
         """Stores light reference data
         """
-      
-        for i in range(len(self.connected_spectrometers)):  
-            
-            wave, inten = self.connected_spectrometers[i].chart_queue.get()
+        for i in range(len(self.connected_spectrometers)):
+            try:
+                wave, inten = self.connected_spectrometers[i].chart_queue.get(timeout=5)
+            except Exception as e:
+                debugp("SetLightRef", f"No data available from spectrometer {i}: {e}")
+                self.notification(f"No spectrometer data for light reference", color="#8e0101")
+                continue
+
             self.light_reference_wavelengths[i] = wave.copy()
             self.light_reference_intensities[i] = inten.copy()
-             
             self.light_ref_acquisition_time[i] = self.connected_spectrometers[i].integration_time
-            
+
             if self.light_reference_intensities[i] is not None:
                 self.light_reference = True
+                # Save light reference into the current experiment folder under "LightReferences/<spec_name>/"
+                spec_name = self.connected_spectrometers[i].name.split("-")[-1]
+                ref_dir = self.file_system.get_calibration_directory("LightReferences")
+                spec_dir = os.path.join(ref_dir, spec_name)
+                try:
+                    os.makedirs(spec_dir, exist_ok=True)
+                    file_name = f"light_{i}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.connected_spectrometers[i].integration_time}ms.txt"
+                    file_path = os.path.join(spec_dir, file_name)
+                    self.single_save(file_path, self.light_reference_wavelengths[i], self.light_reference_intensities[i], True, True, i)
+                    debugp("SetLightRef", f"Saved light reference to {file_path}")
+                except Exception as e:
+                    debugp("SetLightRef", f"Failed saving light reference: {e}")
+                    self.notification(f"Failed to save light reference: {e}", color="#8e0101")
                 self.notification(f"Light reference successfully recorded", color="#1a8300")
             else:
                 self.light_reference = False
                 self.notification(f"There is no data to save for the light reference", color="#8e0101")
 
 
-    def set_dark_reference(self):
+    def set_dark_reference(self, display_notification=True):
         """Stores dark reference data
         """
-       
-        for i in range(len(self.connected_spectrometers)):      
-            
-            wave, inten = self.connected_spectrometers[i].chart_queue.get()
+        saved_dirs = []
+        for i in range(len(self.connected_spectrometers)):
+            try:
+                wave, inten = self.connected_spectrometers[i].chart_queue.get(timeout=5)
+            except Exception as e:
+                debugp("SetDarkRef", f"No data available from spectrometer {i}: {e}")
+                self.notification(f"No spectrometer data for dark reference", color="#8e0101")
+                continue
+
             self.dark_reference_wavelengths[i] = wave.copy()
             self.dark_reference_intensities[i] = inten.copy()
-             
             self.dark_ref_acquisition_time[i] = self.connected_spectrometers[i].integration_time
-       
+
             if self.dark_reference_intensities[i] is not None:
                 self.dark_reference = True
-                self.notification(f"Dark reference successfully recorded", color="#1a8300")
+                # Save dark reference into the current experiment folder under "DarkReferences/<spec_name>/"
+                spec_name = self.connected_spectrometers[i].name.split("-")[-1]
+                ref_dir = self.file_system.get_calibration_directory("DarkReferences")
+                spec_dir = os.path.join(ref_dir, spec_name)
+                try:
+                    os.makedirs(spec_dir, exist_ok=True)
+                    file_name = f"dark_{i}__{datetime.now():%Y%m%d_%H.%M.%S}_{self.connected_spectrometers[i].integration_time}ms.txt"
+                    file_path = os.path.join(spec_dir, file_name)
+                    # pass display_notification through so callers can suppress per-file notifications
+                    self.single_save(file_path, self.dark_reference_wavelengths[i], self.dark_reference_intensities[i], True, True, i, display_notification)
+                    debugp("SetDarkRef", f"Saved dark reference to {file_path}")
+                    saved_dirs.append(spec_dir)
+                except Exception as e:
+                    debugp("SetDarkRef", f"Failed saving dark reference: {e}")
+                    if display_notification:
+                        self.notification(f"Failed to save dark reference: {e}", color="#8e0101")
+                if display_notification:
+                    self.notification(f"Dark reference successfully recorded", color="#1a8300")
             else:
                 self.dark_reference = False
                 self.notification(f"There is no data to save for the dark reference", color="#8e0101")
+        # return list of directories where dark references were stored (may be empty)
+        return saved_dirs
 
 
 
