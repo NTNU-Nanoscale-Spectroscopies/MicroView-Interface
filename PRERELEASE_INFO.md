@@ -1,3 +1,14 @@
+v3.1.0
+
+    Added:
+        - LM and GM separated
+        - Thorlabs 8051 CCD camera in LM
+    
+    Removed:
+
+    Bugs:
+        -Random movements of polarizer
+
 v3.0.4
 
     Added:

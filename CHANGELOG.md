@@ -1,9 +1,12 @@
 # Changelog
+## [3.1.0] - 2026-02-01
+### <span style="color:green"> Added </span>
+- Dev : Separated LM and GM
+- Dev : Thorlabs CCD 8051 Camera implemented in LM
+
 ## [3.0.4] - 2026-01-10
 ### <span style="color:green"> Added </span>
 - Dev : Polarizer sweep routine added
-
-
 
 ## [3.0.3] - 2025-11-11
 ### <span style="color:green"> Added </span>

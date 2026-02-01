@@ -53,6 +53,8 @@ pyinstaller microview.spec
 ````
 The executable will be located in the `/dist` folder within your project directory.
 
+If you are working with the legacy Thorlabs CCD (TLCameraSDK/pythonnet path), see `dev/devices/camera/CCD_RUNTIME.md` for runtime dependencies and a quick probe command.
+
 
 ## Contributors
 This project would not have been possible without these contributors :

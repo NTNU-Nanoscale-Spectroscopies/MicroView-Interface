@@ -1,0 +1,12 @@
+﻿python : Traceback (most recent call last):
+At line:1 char:1
++ python -u .\\dev\\diagnose_camera.py 11499 2>&1 | Out-File -Encoding  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteExcept 
+   ion
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\el-ei\Documents\Masterproject\Code\MicroView-Interface\dev\diagnose_camera.py", line 
+10, in <module>
+    from dev.devices.camera.windows_setup import configure_path
+ModuleNotFoundError: No module named 'dev'
