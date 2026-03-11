@@ -22,6 +22,8 @@ class MySimCamera(MyCamera):
         self.enable = enable
         self.connected = False
         self.is_running = False
+        self.is_zelux = True
+        self.auto_exposure_enabled = False
         self.image_acquisition_thread = None
         self.sftt_timer = False
         self.software_trigger_timer = threading.Timer(0.3,self.software_trigger_timer_done)

@@ -1,3 +1,23 @@
+v3.5.0
+
+    Added:
+        -GUI changes: splash screen and loading screen
+        -GM Filterwheel (Thorlabs FW212C), with interface
+        -GM Power meter (Thorlabs PM16-401), with interface
+        -GM Raman spectroscopy microscope interface
+        -GM stage control device (Thorlabs MCM301), with interface
+        -GM rotation mount device for half wave plate (Thorlabs ELL14)
+        -GM camera device: auto exposure time
+        -LM stage control device (Thorlabs MCM3001), with interface
+    
+    Tested:
+        -GM laser shutter (Thorlabs KSC101, Thorlabs SH05R/M)
+        -White light shutter (Thorlabs KST201, FW103/M)
+        
+    Removed:
+
+    Bugs:
+
 v3.1.0
 
     Added:

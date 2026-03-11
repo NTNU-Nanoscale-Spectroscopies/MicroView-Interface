@@ -2,6 +2,7 @@ from ..images.images import *
 from .notification import *
 import queue
 import re
+from customtkinter import BooleanVar
 
 class CameraFrame(CTkFrame):
     """Class for creating a frame to control a camera"""
@@ -98,7 +99,20 @@ class CameraFrame(CTkFrame):
             self.exposure_label.grid(row=0, column=2, padx=(1, 5), sticky="w")
 
             self.exposure_set = CTkButton(self.exposure_frame, text="Set", width=40, command=self.on_exposure_entry_updated)
-            self.exposure_set.grid(row=0, column=3, padx=(5, 10), sticky="w")
+            self.exposure_set.grid(row=0, column=3, padx=(5, 5), sticky="w")
+
+            # Auto-exposure checkbox – only shown for Zelux cameras
+            self.auto_exposure_var = BooleanVar(value=False)
+            self.auto_exposure_checkbox = CTkCheckBox(
+                self.exposure_frame,
+                text="Auto",
+                variable=self.auto_exposure_var,
+                width=60,
+                command=self.on_auto_exposure_toggled,
+            )
+            if getattr(self.camera, "is_zelux", False):
+                self.exposure_frame.columnconfigure(4, weight=0)
+                self.auto_exposure_checkbox.grid(row=0, column=4, padx=(5, 10), sticky="w")
 
             self.current_image = None
             if self.camera.enable: 
@@ -152,6 +166,11 @@ class CameraFrame(CTkFrame):
                     self.resize_image()
                 ctk_image = CTkImage(self.current_image, size=(self.image_width, self.image_height))
                 self.image_label.configure(image=ctk_image)
+
+                # Run software auto-exposure adjustment if enabled
+                if getattr(self.camera, "auto_exposure_enabled", False):
+                    self.camera.auto_adjust_exposure(self.current_image)
+
             except queue.Empty:
                 pass
             self.after(100, self.update_image)
@@ -221,8 +240,14 @@ class CameraFrame(CTkFrame):
         
         
     def on_exposure_entry_updated(self):
-        """Updates the slider and sets the camera exposure
+        """Updates the slider and sets the camera exposure.
+        Also disables auto-exposure when the user manually sets a value.
         """
+        # Disable auto-exposure on manual set
+        if self.auto_exposure_var.get():
+            self.auto_exposure_var.set(False)
+            self.on_auto_exposure_toggled()
+
         str_val = self.exposure_display.get()
         match = re.search(r'\b\d+(\.\d+)?\b', str_val)
         if match:
@@ -265,3 +290,9 @@ class CameraFrame(CTkFrame):
             self.master.notification(f"Warning: Low exposure time may cause lag in the spectrometer.", color="#ffa500")
 
         self.camera.update_exposure(value)
+
+
+    def on_auto_exposure_toggled(self):
+        """Called when the auto-exposure checkbox is toggled."""
+        enabled = self.auto_exposure_var.get()
+        self.camera.set_auto_exposure(enabled)

@@ -1,4 +1,5 @@
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
+from customtkinter import Variable as CTkVariable, CTkOptionMenu
 from CTkToolTip import *
 from dev.debugHelp import debugp
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
@@ -8,7 +9,12 @@ from ..devices.camera.camera import *
 from ..devices.spectrometer import *
 from ..devices.shutter.shutter import *
 from ..devices.filter import *
+from ..devices.power_meter.power_meter import *
+# filter wheel device implementation (extends MyFilter)
+from ..devices.filter_wheel.filterwheel import MyFilterWheel
 from ..devices.stage import *
+from ..devices.Stage.sim_stage import MySimStage
+from ..devices.Stage.mcm301_stage import MyMCM301Stage
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -43,6 +49,9 @@ class QuickSetupFrame(CTkScrollableFrame):
             Object containing all the information related to a microscope
         """
         super().__init__(master)
+        # CTkScrollableFrame wraps the real master in internal frames, so
+        # self.master does NOT point to the app.  Store a direct reference.
+        self._app = master
         self.device_entries = []
         # Headline
         title = CTkLabel(self, text="Devices", font=HEADLINE_FONT)
@@ -73,11 +82,62 @@ class QuickSetupFrame(CTkScrollableFrame):
                 widgets.append((entry,""))
                 widgets.append((label,"NonDisableable"))
 
-            elif isinstance(device, MyFilter):
-                pass
+            elif isinstance(device, MyFilterWheel):
+                # build controls for a filter wheel: left/right arrows, position dropdown, settings
+                left_btn = CTkButton(frame, text="◀", width=30, state="disabled")
+                right_btn = CTkButton(frame, text="▶", width=30, state="disabled")
+                # variable to hold selection
+                var = CTkVariable(value="")
+                dropdown = CTkOptionMenu(frame, values=[], variable=var, width=120, state="disabled")
+                settings = CTkButton(frame, text="", width=30, height=30,
+                                     image=img_cogwheel, fg_color="transparent",
+                                     state="normal", command=lambda d=device: self.open_filter_settings(d))
+                CTkToolTip(settings, delay=0.2, message="Settings")
 
-            elif isinstance(device, MyStage):
-                pass
+                # attach UI handles to device for later updates
+                device._ui_left_btn = left_btn
+                device._ui_right_btn = right_btn
+                device._ui_dropdown = dropdown
+                device._ui_position_var = var
+                device._ui_settings_btn = settings
+
+
+                # callbacks
+                def move_delta(delta, dev=device):
+                    newpos = dev.step(delta)
+                    if newpos is not None:
+                        dev.update_ui()
+                def dropdown_changed(val, dev=device):
+                    try:
+                        idx = int(val.split(":")[0])
+                    except Exception:
+                        return
+                    dev.set_position(idx)
+                    dev.update_ui()
+
+                left_btn.configure(command=lambda d=device: move_delta(-1))
+                right_btn.configure(command=lambda d=device: move_delta(1))
+                dropdown.configure(command=dropdown_changed)
+
+                # pack widgets
+                left_btn.pack(side="left", padx=5)
+                dropdown.pack(side="left")
+                right_btn.pack(side="left", padx=5)
+                settings.pack(side="left", padx=(0,0))
+
+                widgets.append((left_btn, ""))
+                widgets.append((dropdown, ""))
+                widgets.append((right_btn, ""))
+                widgets.append((settings, "NonDisableable"))
+
+            elif isinstance(device, (MyStage, MySimStage, MyMCM301Stage)):
+                settings = CTkButton(frame, text="", width=30, height=30, image=img_cogwheel, fg_color="transparent", state="disabled", command=lambda d=device : self.open_stage_settings(d))
+                CTkToolTip(settings, delay=0.2, message="Settings") 
+                settings.pack(side="left", padx=(0,0))
+                widgets.append((settings,""))
+
+            elif isinstance(device, MyPowerMeter):
+                master_frame = self.master.master.master.power_meter_frame
 
             elif isinstance(device, MyShutter):
                 button = CTkButton(frame, text="Close", state="disabled", width=70, fg_color="transparent", border_width=2, border_color="#920000", hover_color="#4b0000")
@@ -138,8 +198,8 @@ class QuickSetupFrame(CTkScrollableFrame):
             #Get the frame to establish a connction, or get the device name to display error message
             element = entry.frame or entry.device
             
-            #If spectrometer, connect the right one if not connect the device normally
-            if isinstance(entry.device, MySpectrometer):  
+            #If spectrometer or power meter, pass the device to the frame's connect
+            if isinstance(entry.device, (MySpectrometer, MyPowerMeter)):  
                 if not element.connect(entry.device):
                     print(f"{entry.frame} , {entry.device}")
                     print(f"Unable to connect to {entry.device.name} {entry.device.serial}")
@@ -164,7 +224,21 @@ class QuickSetupFrame(CTkScrollableFrame):
         """
         for entry in self.device_entries:
             #debugp("connecting", "checking device : " + str(entry))
-            entry.activate() if entry.is_device_connected() else entry.desactivate()
+            if entry.is_device_connected():
+                entry.activate()
+                # allow device to refresh its UI if it defines such method
+                if hasattr(entry.device, "post_connect_update"):
+                    try:
+                        entry.device.post_connect_update()
+                    except Exception:
+                        pass
+            else:
+                entry.desactivate()
+        # let the application know device connectivity changed so any
+        # dependent controls (toggle button) can be updated
+        app = self._app
+        if hasattr(app, "update_spec_pwr_toggle_state"):
+            app.update_spec_pwr_toggle_state()
 
 
     def toggle_device(self, entry):
@@ -195,21 +269,52 @@ class QuickSetupFrame(CTkScrollableFrame):
         #             element.disconnect(spec)
         #             #element.spectrometer = entry.device
 
-        if isinstance(entry.device, MySpectrometer):
+        # spectrometer and power meter frames need the device passed to their
+        # connect() methods so they can update their UI.  the bare device
+        # objects however accept no arguments, so handle both cases.
+        if isinstance(entry.device, (MySpectrometer, MyPowerMeter)):
             if entry.switch.get():
-                if not element.connect(entry.device):
-                    debugp("connecting", "Spectrometer Not Connecting Manually" + str(element))
-                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                try:
+                    if element is entry.device:
+                        success = element.connect()
+                    else:
+                        success = element.connect(entry.device)
+                except TypeError:
+                    # in case the signature doesn't match, try without args
+                    success = element.connect()
+                debugp("connecting", f"after connect call: device.connected={entry.device.connected}, success={success}")
+                if not success:
+                    debugp("connecting", "Device Not Connecting Manually" + str(element))
+                    entry.switch.deselect()
+                    self.notification(
+                        f"Unable to connect to {entry.device.name} {entry.device.serial}",
+                        color="#8e0101",
+                    )
                 else:
-                    debugp("connecting", "Spectrometer Connecting Manually" + str(element))
+                    debugp("connecting", "Device Connecting Manually" + str(element))
+                    # immediately refresh the top‑level toggle button in case the
+                    # generic check_connected_devices later gets skipped for any
+                    # reason (it shouldn’t, but this makes the behaviour robust)
+                    if hasattr(self._app, "update_spec_pwr_toggle_state"):
+                        self._app.update_spec_pwr_toggle_state()
             else:
-                debugp("connecting", "Spectrometer Disconnecting Manually" + str(element))
-                element.disconnect(entry.device)
+                debugp("connecting", "Device Disconnecting Manually" + str(element))
+                # pass device argument only if frame expects it
+                try:
+                    if element is entry.device:
+                        element.disconnect()
+                    else:
+                        element.disconnect(entry.device)
+                except TypeError:
+                    element.disconnect()
         else:
             if entry.switch.get():
                 if not element.connect():
                     print("Tried to connect to device, unsuccessful (toggle_device)")
-                    self.notification(f"Unable to connect to {entry.device.name} {entry.device.serial}", color="#8e0101")
+                    self.notification(
+                        f"Unable to connect to {entry.device.name} {entry.device.serial}",
+                        color="#8e0101",
+                    )
                 else:
                     debugp("connecting", "Connecting " + str(element))
             else:
@@ -367,6 +472,78 @@ class QuickSetupFrame(CTkScrollableFrame):
         self.start_entry = CTkEntry(self.popup, width=220, placeholder_text="0")
         self.start_entry.pack()
 
+    def open_filter_settings(self, device):
+        """Popup window allowing user to name filters for each wheel position."""
+        # avoid opening duplicates
+        if getattr(self, 'popup', None):
+            try:
+                self.popup.lift()
+            except Exception:
+                pass
+            return
+        self.popup = CTkToplevel(self.master)
+        self.popup.title("Filter Wheel Settings")
+        # ensure reference cleared when popup is closed
+        def _on_filter_popup_close():
+            try:
+                self.popup.destroy()
+            except Exception:
+                pass
+            finally:
+                self.popup = None
+        self.popup.protocol("WM_DELETE_WINDOW", _on_filter_popup_close)
+        # compute height: base space for header + one row per position + footer buttons
+        count = device.position_count or device.get_position_count() or 0
+        height = 100 + 30 * count
+        # enforce a sensible minimum so very small wheels still show buttons
+        height = max(height, 180)
+        self.popup.geometry(f"400x{height}")
+        self.popup.resizable(True, True)
+
+        # ensure we know how many positions exist
+        count = device.position_count or device.get_position_count() or 0
+        device.position_count = count
+        self._filter_entries = []
+
+        body = CTkFrame(self.popup)
+        body.pack(padx=10, pady=10, fill="both", expand=True)
+
+        for pos in range(1, count + 1):
+            row = CTkFrame(body)
+            row.pack(fill="x", pady=2)
+            lbl = CTkLabel(row, text=f"Position {pos}:")
+            lbl.pack(side="left")
+            ent = CTkEntry(row, width=200)
+            ent.pack(side="left", padx=5)
+            ent.insert(0, device.filter_names.get(pos, ""))
+            self._filter_entries.append((pos, ent))
+
+        # action buttons
+        btn_frame = CTkFrame(self.popup)
+        btn_frame.pack(pady=10)
+        save_btn = CTkButton(btn_frame, text="Save", command=lambda d=device: self._save_filter_settings(d))
+        save_btn.grid(row=0, column=0, padx=5)
+        cancel_btn = CTkButton(btn_frame, text="Cancel", command=lambda: _on_filter_popup_close())
+        cancel_btn.grid(row=0, column=1, padx=5)
+
+        self.popup.transient(self)
+
+    def _save_filter_settings(self, device):
+        # commit entries to the device and persist
+        for pos, ent in getattr(self, '_filter_entries', []):
+            device.filter_names[pos] = ent.get()
+        if hasattr(device, 'save_settings'):
+            device.save_settings()
+        if hasattr(device, 'update_ui'):
+            device.update_ui()
+        try:
+            self.popup.destroy()
+        except Exception:
+            pass
+        finally:
+            # clear reference so popup can be reopened later
+            self.popup = None
+
         # Stop Angle input (default 360)
         self.label_stop = CTkLabel(self.popup, text="Stop Angle (°):")
         self.label_stop.pack(pady=(10, 5))
@@ -443,6 +620,406 @@ class QuickSetupFrame(CTkScrollableFrame):
         print(wavelength)
         device.set_settings(wavelength, folder_name)
         self.popup.destroy()
+
+    def open_stage_settings(self, device):
+        # make the popup a child of the main app window
+        self.popup = CTkToplevel(self.master)
+        self.popup.title("Stage Settings")
+        self.popup.geometry("700x420")
+        # allow the user to resize the popup
+        self.popup.resizable(True, True)
+        # bring the popup to the front on open, then allow normal window behaviour
+        # CTkToplevel internally toggles -topmost around 200ms after creation,
+        # so we schedule our lift + clear after that internal handler finishes.
+        def _ensure_on_top():
+            try:
+                self.popup.lift()
+                self.popup.focus_force()
+            except Exception:
+                pass
+            # clear topmost so the user can freely switch windows afterwards
+            try:
+                self.popup.after(100, lambda: self.popup.attributes("-topmost", False))
+            except Exception:
+                pass
+
+        try:
+            self.popup.attributes("-topmost", True)
+            self.popup.lift()
+            self.popup.focus_force()
+            # run after CTkToplevel's internal topmost handler (~200ms)
+            self.popup.after(500, _ensure_on_top)
+        except Exception:
+            pass
+
+        def _on_popup_close():
+            try:
+                self.popup.destroy()
+            except Exception:
+                pass
+
+        try:
+            self.popup.protocol('WM_DELETE_WINDOW', _on_popup_close)
+        except Exception:
+            pass
+
+        # Top label showing current Z position
+        top_frame = CTkFrame(self.popup, fg_color="transparent")
+        top_frame.pack(pady=(10, 5), fill="x")
+        self.z_label = CTkLabel(top_frame, text="Z: 0.0000", font=("Arial", 14))
+        self.z_label.pack()
+
+        self._stage_body = CTkFrame(self.popup)
+        self._stage_body.pack(padx=10, pady=5, fill="both", expand=True)
+        self._stage_body.grid_rowconfigure(0, weight=1)
+        self._stage_body.grid_columnconfigure(0, weight=1)
+
+        # container pages — both sit in the same grid cell; only one visible at a time
+        self._stage_page = CTkFrame(self._stage_body, fg_color="transparent")
+        self._stage_page.grid(row=0, column=0, sticky="nsew")
+        self._saved_page = CTkFrame(self._stage_body, fg_color="transparent")
+        # start with saved page hidden
+        self._saved_page.grid(row=0, column=0, sticky="nsew")
+        self._saved_page.grid_remove()
+
+        # Left: vertical slider with min/max displays (placed on stage page)
+        # Read the device safety limit (in mm) if available; fall back to 3 mm
+        try:
+            slider_limit = device._position_limit_um / 1000.0
+        except Exception:
+            slider_limit = 3.0
+        slider_steps = max(int(slider_limit * 2 / 0.05), 10)  # 50 µm per step
+
+        slider_frame = CTkFrame(self._stage_page)
+        slider_frame.grid(row=0, column=0, rowspan=3, padx=(10,20), sticky="ns")
+
+        self.max_entry = CTkEntry(slider_frame, width=50, justify="center")
+        self.max_entry.insert(0, str(slider_limit))
+        self.max_entry.configure(state="disabled")
+        self.max_entry.pack()
+
+        # Vertical slider: make it thin and vertical
+        try:
+            self.stage_slider = CTkSlider(slider_frame, from_=slider_limit, to=-slider_limit, number_of_steps=slider_steps, orientation="vertical", height=220, width=20, command=self._on_slider_changed)
+        except Exception:
+            # fallback if orientation not supported
+            self.stage_slider = CTkSlider(slider_frame, from_=slider_limit, to=-slider_limit, number_of_steps=slider_steps, command=self._on_slider_changed)
+        self.stage_slider.pack(pady=5, fill="y", expand=True)
+
+        self.min_entry = CTkEntry(slider_frame, width=50, justify="center")
+        self.min_entry.insert(0, str(-slider_limit))
+        self.min_entry.configure(state="disabled")
+        self.min_entry.pack()
+
+        # Middle: plus/minus controls and setpoint
+        ctrl_frame = CTkFrame(self._stage_page, fg_color="transparent")
+        ctrl_frame.grid(row=0, column=1, sticky="n", padx=(5,10))
+
+        # plus/minus buttons
+        pm_frame = CTkFrame(ctrl_frame, fg_color="transparent")
+        pm_frame.pack(pady=(10,5))
+        plus_btn = CTkButton(pm_frame, text="+", width=40, command=lambda: self._step_stage(device, 1))
+        minus_btn = CTkButton(pm_frame, text="-", width=40, command=lambda: self._step_stage(device, -1))
+        plus_btn.grid(row=0, column=0, padx=5)
+        minus_btn.grid(row=1, column=0, padx=5, pady=(5,0))
+
+        # Center setpoint entry with label
+        setpoint_frame = CTkFrame(ctrl_frame, fg_color="transparent")
+        setpoint_frame.pack(pady=(10,5))
+        lbl = CTkLabel(setpoint_frame, text="Move to position:")
+        lbl.grid(row=0, column=0, padx=(0,8))
+        self.setpoint_entry = CTkEntry(setpoint_frame, width=120, placeholder_text="0.0")
+        self.setpoint_entry.grid(row=0, column=1)
+
+        # Button row: Go, Save Position, Set Zero
+        btn_row = CTkFrame(ctrl_frame, fg_color="transparent")
+        btn_row.pack(pady=(15,5))
+        go_btn = CTkButton(btn_row, text="Go", width=80, command=lambda d=device: self._go_to_setpoint(d))
+        save_btn = CTkButton(btn_row, text="Save Position", width=100, command=lambda d=device: self._save_position(d))
+        zero_btn = CTkButton(btn_row, text="Set Zero", width=80, command=lambda d=device: self._set_zero(d))
+        go_btn.grid(row=0, column=0, padx=5)
+        save_btn.grid(row=0, column=1, padx=5)
+        zero_btn.grid(row=0, column=2, padx=5)
+
+        # Right: Step size and mode
+        right_frame = CTkFrame(self._stage_page, fg_color="transparent")
+        right_frame.grid(row=0, column=2, sticky="n", padx=(10,5))
+
+        step_frame = CTkFrame(right_frame, fg_color="transparent")
+        step_frame.pack(pady=(20,5))
+        # units are always millimetres for the stage control panel
+        CTkLabel(step_frame, text="Step size (mm)").grid(row=0, column=0, sticky="w")
+        self.step_entry = CTkEntry(step_frame, width=80)
+        self.step_entry.insert(0, "0.5")
+        self.step_entry.grid(row=0, column=1, padx=(8,0))
+
+        # Mode (Coarse/Fine) - implemented as simple option menu
+        mode_frame = CTkFrame(right_frame, fg_color="transparent")
+        mode_frame.pack(pady=(10,5))
+        CTkLabel(mode_frame, text="Mode:").grid(row=0, column=0, sticky="w")
+        try:
+            self.mode_menu = CTkOptionMenu(mode_frame, values=["Coarse","Fine"]) 
+            self.mode_menu.set("Coarse")
+            self.mode_menu.grid(row=0, column=1, padx=(8,0))
+            # attach behaviour when the user switches mode
+            self.mode_menu.configure(command=lambda _v=None: self._on_mode_change())
+        except Exception:
+            # fallback: use an entry to display mode (read-only)
+            self.mode_var = CTkEntry(mode_frame, width=80)
+            self.mode_var.insert(0, "Coarse")
+            self.mode_var.configure(state="disabled")
+            self.mode_var.grid(row=0, column=1, padx=(8,0))
+
+        # initialize displayed values
+        try:
+            current = float(getattr(device, 'get_position', lambda: 0)())
+        except Exception:
+            current = 0.0
+        self._update_z_display(current)
+        try:
+            self.stage_slider.set(current)
+        except Exception:
+            pass
+
+        # small helper: update label periodically if device provides position
+        def _periodic_update():
+            try:
+                pos = float(getattr(device, 'get_position', lambda: None)() or 0)
+                self._update_z_display(pos)
+                try:
+                    self.stage_slider.set(pos)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            self.popup.after(200, _periodic_update)
+
+        _periodic_update()
+
+        # Footer: saved positions button on the right for stage control page
+        self._footer = CTkFrame(self.popup, fg_color="transparent")
+        self._footer.pack(fill="x", padx=10, pady=(6,10))
+        self._saved_btn = CTkButton(self._footer, text="Saved positions", width=140, command=lambda d=device: self._show_saved_positions(d))
+        self._saved_btn.pack(side="right")
+
+    def _show_saved_positions(self, device):
+        # hide stage page, show saved positions page
+        try:
+            self._stage_page.grid_remove()
+        except Exception:
+            pass
+
+        # destroy old saved-page content and rebuild
+        try:
+            for w in list(self._saved_page.winfo_children()):
+                w.destroy()
+        except Exception:
+            pass
+
+        header = CTkLabel(self._saved_page, text="Saved positions:", font=("Arial", 14))
+        header.pack(pady=(10,8))
+
+        # list saved positions from device.saved_positions if available
+        positions = getattr(device, 'saved_positions', None)
+        if not positions:
+            # try single saved_position
+            sp = getattr(device, 'saved_position', None)
+            positions = [sp] if sp is not None else []
+
+        if positions:
+            for idx, entry in enumerate(positions, start=1):
+                # entries can be (name, pos) tuples or bare floats (legacy)
+                if isinstance(entry, (list, tuple)) and len(entry) == 2:
+                    label_name, pos_val = entry[0], entry[1]
+                else:
+                    label_name, pos_val = None, entry
+                try:
+                    pos_float = float(pos_val)
+                    if label_name:
+                        btn_text = f"{label_name}  ({pos_float:.4f} mm)"
+                    else:
+                        btn_text = f"{idx}: {pos_float:.4f} mm"
+                except Exception:
+                    btn_text = f"{idx}: {entry}"
+                    pos_float = None
+                btn = CTkButton(self._saved_page, text=btn_text, width=260,
+                                fg_color="transparent", border_width=2, border_color="#1F6AA5",
+                                anchor="w")
+                if pos_float is not None:
+                    # capture pos_float by value for the lambda
+                    btn.configure(command=lambda d=device, p=pos_float: self._go_to_saved_position(d, p))
+                else:
+                    btn.configure(state="disabled")
+                btn.pack(anchor="w", padx=20, pady=3)
+        else:
+            CTkLabel(self._saved_page, text="(No saved positions)").pack(pady=10)
+
+        # footer for saved page: back button on left
+        for child in list(self._footer.winfo_children()):
+            try:
+                child.pack_forget()
+            except Exception:
+                pass
+        back_btn = CTkButton(self._footer, text="Stage control", width=140, command=lambda d=device: self._show_stage_control(d))
+        back_btn.pack(side="left")
+
+        self._saved_page.grid(row=0, column=0, sticky="nsew")
+
+    def _show_stage_control(self, device):
+        # hide saved page, show stage page
+        try:
+            self._saved_page.grid_remove()
+        except Exception:
+            pass
+        # restore footer saved button
+        for child in list(self._footer.winfo_children()):
+            try:
+                child.pack_forget()
+            except Exception:
+                pass
+        self._saved_btn.pack(side="right")
+        self._stage_page.grid(row=0, column=0, sticky="nsew")
+
+    # --- Stage control helper methods ---
+    def _update_z_display(self, value):
+        try:
+            self.z_label.configure(text=f"Z: {float(value):.4f}")
+        except Exception:
+            self.z_label.configure(text=f"Z: {value}")
+
+    def _on_slider_changed(self, value):
+        # update setpoint entry when slider moves
+        try:
+            v = float(value)
+            self.setpoint_entry.delete(0, "end")
+            self.setpoint_entry.insert(0, f"{v:.4f}")
+            self._update_z_display(v)
+        except Exception:
+            pass
+
+    def _on_mode_change(self, *_args):
+        """Adjust the step-entry value when the mode dropdown changes.
+
+        *Coarse* -> *Fine* multiplies current step by 0.1.
+        *Fine* -> *Coarse* multiplies by 10.  This behaviour ensures
+a single additional decimal place is added or removed, matching the
+user request.
+        """
+        try:
+            val = float(self.step_entry.get())
+        except Exception:
+            return
+        mode = None
+        try:
+            mode = self.mode_menu.get()
+        except Exception:
+            # fallback entry contains the text
+            mode = getattr(self, 'mode_var', None) and self.mode_var.get()
+        if mode == "Fine":
+            new = val * 0.1
+        else:
+            new = val * 10.0
+        # format with appropriate precision (always show one or two decimals)
+        fmt = "{:.2f}" if mode == "Fine" else "{:.1f}"
+        self.step_entry.delete(0, "end")
+        self.step_entry.insert(0, fmt.format(new))
+
+    def _step_stage(self, device, direction):
+        # step by the step size (direction: 1 or -1)
+        try:
+            step = float(self.step_entry.get())
+        except Exception:
+            step = 0.5
+        delta = step * (1 if direction > 0 else -1)
+
+        def _worker():
+            try:
+                if hasattr(device, 'step'):
+                    device.step(delta)
+                elif hasattr(device, 'move_by'):
+                    device.move_by(delta)
+                elif hasattr(device, 'get_position') and hasattr(device, 'move_to'):
+                    cur = float(device.get_position() or 0)
+                    device.move_to(cur + delta)
+                else:
+                    self.after(0, lambda: messagebox.showinfo("Not implemented", "Stage stepping not implemented for this device."))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Error", f"Unable to step stage: {e}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _go_to_setpoint(self, device):
+        try:
+            target = float(self.setpoint_entry.get())
+        except Exception:
+            messagebox.showerror("Invalid value", "Please enter a valid numeric setpoint.")
+            return
+
+        def _worker():
+            try:
+                if hasattr(device, 'move_to'):
+                    device.move_to(target)
+                elif hasattr(device, 'set_position'):
+                    device.set_position(target)
+                else:
+                    self.after(0, lambda: messagebox.showinfo("Not implemented", "Direct move not implemented for this device."))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Error", f"Unable to move stage: {e}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _set_zero(self, device):
+        def _worker():
+            try:
+                if hasattr(device, 'set_zero'):
+                    device.set_zero()
+                elif hasattr(device, 'move_to'):
+                    device.move_to(0)
+                else:
+                    self.after(0, lambda: messagebox.showinfo("Not implemented", "Set zero not implemented for this device."))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Error", f"Unable to set zero: {e}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _go_to_saved_position(self, device, pos):
+        """Move the stage to a previously saved position (threaded)."""
+        def _worker():
+            try:
+                if hasattr(device, 'move_to'):
+                    device.move_to(pos)
+                elif hasattr(device, 'set_position'):
+                    device.set_position(pos)
+                else:
+                    self.after(0, lambda: messagebox.showinfo("Not implemented", "Direct move not implemented for this device."))
+            except Exception as e:
+                self.after(0, lambda: messagebox.showerror("Error", f"Unable to move to saved position: {e}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _save_position(self, device):
+        try:
+            pos = None
+            if hasattr(device, 'get_position'):
+                pos = float(device.get_position() or 0)
+            if pos is None:
+                messagebox.showinfo("Save", "Could not read current position to save.")
+                return
+            # prompt user for a name
+            name = simpledialog.askstring("Save Position", f"Position: {pos:.4f} mm\nEnter a name:",
+                                          parent=self.popup if hasattr(self, 'popup') and self.popup else self)
+            if not name:
+                return  # user cancelled
+            # store on device as (name, position) tuples
+            try:
+                if not hasattr(device, 'saved_positions'):
+                    device.saved_positions = []
+                device.saved_positions.append((name.strip(), pos))
+                device.saved_position = pos
+            except Exception:
+                pass
+        except Exception as e:
+            messagebox.showerror("Error", f"Unable to save position: {e}")
 
 
 class DeviceEntry:

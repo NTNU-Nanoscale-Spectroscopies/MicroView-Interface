@@ -267,6 +267,11 @@ class MyCamera():
         self.enable = enable
         self.connected = False
         self.is_running = False
+        self.is_zelux = False
+        self.auto_exposure_enabled = False
+        self._auto_exposure_target = 115  # Target mean brightness (0-255 scale)
+        self._auto_exposure_min_us = 40  # Minimum exposure in microseconds
+        self._auto_exposure_max_us = 1_000_000  # Maximum exposure in microseconds (1000 ms)
         self.image_acquisition_thread = None
         self.sftt_timer = False
         self.software_trigger_timer = threading.Timer(0.3,self.software_trigger_timer_done)
@@ -296,9 +301,10 @@ class MyCamera():
                 camera_list = []
             
             if self.serial in (camera_list or []):
-                # Found via ctypes SDK - use it
+                # Found via ctypes SDK - use it (Zelux / TSI camera)
                 self.sdk = ctypes_sdk
                 self.camera_list = camera_list
+                self.is_zelux = True
                 try:
                     self.camera = self.sdk.open_camera(self.serial)
                     self.camera.frames_per_trigger_zero_for_unlimited = 0
@@ -420,6 +426,63 @@ class MyCamera():
             print("Exposure time updated : ", self.camera.exposure_time_us)
         else:
             print(f"Can't update exposure time : \nCam connected:{self.connected}\nCam running:{self.is_running}\nTimer Finished{self.sftt_timer}")
+
+    def set_auto_exposure(self, enabled):
+        """Enable or disable software auto-exposure.
+
+        Parameters
+        ------------
+        enabled : `bool`
+            Whether auto-exposure should be active
+        """
+        self.auto_exposure_enabled = enabled
+        if enabled:
+            debugp("Camera", "Auto-exposure enabled")
+        else:
+            debugp("Camera", "Auto-exposure disabled")
+
+    def auto_adjust_exposure(self, pil_image):
+        """Analyse the current frame brightness and adjust exposure time.
+
+        Uses a simple proportional controller to steer the mean brightness
+        towards `_auto_exposure_target`.  Only adjusts when the camera is
+        connected, running, and the initial software-trigger timer has elapsed.
+
+        Parameters
+        ------------
+        pil_image : `PIL.Image`
+            The most recent frame from the camera
+        """
+        if not (self.auto_exposure_enabled and self.connected and self.is_running and self.sftt_timer):
+            return
+
+        try:
+            grey = pil_image.convert("L")
+            mean_brightness = np.mean(np.array(grey))
+
+            if mean_brightness < 1:
+                mean_brightness = 1  # avoid division by zero
+
+            current_us = self.camera.exposure_time_us
+            ratio = self._auto_exposure_target / mean_brightness
+
+            # Only adjust if brightness is more than 10 % off target
+            if 0.90 < ratio < 1.10:
+                return
+
+            # Smooth the adjustment to prevent oscillation
+            adjustment = 1 + (ratio - 1) * 0.5
+            new_us = int(current_us * adjustment)
+
+            # Clamp to valid range
+            new_us = max(self._auto_exposure_min_us, min(new_us, self._auto_exposure_max_us))
+
+            if new_us != current_us:
+                self.camera.exposure_time_us = new_us
+                debugp("Camera", f"Auto-exposure: brightness={mean_brightness:.1f}, "
+                       f"{current_us} -> {new_us} us")
+        except Exception as e:
+            debugp("Camera", f"Auto-exposure adjustment error: {e}")
 
     def software_trigger_timer_done(self):
             self.sftt_timer = True

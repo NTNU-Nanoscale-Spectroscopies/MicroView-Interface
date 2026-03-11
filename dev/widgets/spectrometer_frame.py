@@ -40,7 +40,7 @@ class SpectrometerFrame(CTkFrame):
         self.grid_rowconfigure(5, weight=1)
         self.grid_propagate(False)
         
-        self.spectrometer_count = len(spectrometers)
+        self.spectrometer_count = len(spectrometers) if spectrometers else 0
 
         if not spectrometers:
             self.label = CTkLabel(self, text="No spectrometer", font=("Arial", 25))
@@ -924,7 +924,7 @@ class SpectrometerFrame(CTkFrame):
     def on_closing(self):
         """Stops the current thread and disconnects the spectrometer cleanly
         """
-        for spec in self.connected_spectrometers:
+        for spec in getattr(self, 'connected_spectrometers', []):
             if spec:
                 self.backups_counts = 0
                 time.sleep(0.2)

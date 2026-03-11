@@ -2,7 +2,12 @@ from datetime import *
 import threading
 import time
 from tkinter import Toplevel
-import elliptec
+# elliptec is an optional hardware library; allow the module to be imported
+# even when the library isn't installed (e.g. during development).
+try:
+    import elliptec
+except ImportError:
+    elliptec = None
 from CTkToolTip import *
 import numpy as np
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate

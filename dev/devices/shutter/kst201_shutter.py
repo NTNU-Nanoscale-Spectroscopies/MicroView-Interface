@@ -129,6 +129,22 @@ class KST201_Shutter():
                     print("Stage selection attempt failed:", e)
 
             self.connected = True
+            # Perform a dedicated homing/open cycle at startup so that the
+            # physical shutter wheel ends up in a known "open" orientation.
+            #
+            # The controller's internal position counter can be overwhelmed if
+            # the wheel is moved while power is removed; after reconnecting the
+            # device the software may think it is already at the desired angle
+            # and therefore never issue any motion commands.  By explicitly
+            # homing and then driving to the visible open angle (taking an
+            # extra full revolution for filter‑wheel stages) we guarantee that
+            # the mechanical aperture is correct.  This routine is a no‑op for
+            # non‑FW103/M stages.
+            self._initial_homing()
+
+            # now honour the original enable flag; note that _initial_homing
+            # already leaves the wheel open so calling close() below only
+            # affects the final state, not the calibration.
             if self.enable:
                 self.open()
             else:
@@ -206,6 +222,65 @@ class KST201_Shutter():
                 pass
         return False
 
+    def _initial_homing(self):
+        """Perform a homing/open cycle at application startup.
+
+        This helper is only meaningful when we are using a filter-wheel stage
+        (FW103/M family).  When the controller is powered down it can be moved
+        by hand; the next time it powers up the internal step counter may not
+        correspond to the physical orientation.  If the code simply asks the
+        controller to move to ``open_angle`` it will happily do nothing because
+        the controller already *thinks* it is there.  The result is the wheel
+        remains in a bogus "in‑between" position and subsequent opens/closes
+        toggle between two incorrect angles.
+
+        To avoid that we always call ``Home`` (reset the software counter),
+        then force at least one full revolution before finally moving to the
+        visible open angle.  That guarantees the aperture is actually aligned
+        even if the internal counter was completely out of sync.
+        """
+        # only perform the extra work for FW103-style filter wheel stages
+        if not (self.stage and 'FW103' in self.stage.upper()):
+            return
+
+        # attempt a proper homing first; we ignore failures below because the
+        # successive moves will still provide a mechanical reference.
+        try:
+            if hasattr(self.shutter, 'Home'):
+                self.shutter.Home(5000)
+                time.sleep(0.5)
+        except Exception as e:
+            print("_initial_homing: Home call failed:", e)
+
+        # drive at least one full extra revolution to ensure the wheel passes
+        # through the physical open position.  Use _move_to so the same
+        # candidate logic applies.
+        try:
+            # create a Decimal if possible to match what _move_to does
+            extra_target = Decimal(float(self.open_angle + 360.0))
+        except Exception:
+            extra_target = self.open_angle + 360.0
+
+        if not self._move_to(extra_target, timeout=5000):
+            # if the absolute move failed maybe the controller wants a relative
+            # command
+            if hasattr(self.shutter, 'MoveRelative'):
+                try:
+                    self.shutter.MoveRelative(extra_target, 5000)
+                    time.sleep(0.5)
+                except Exception as e:
+                    print("_initial_homing: MoveRelative failed", e)
+
+        # finally go to the nominal open angle
+        try:
+            if not self._move_to(self.open_angle, timeout=2000):
+                # fall back to the existing open() convenience method
+                self.open()
+            else:
+                self.is_open = True
+        except Exception as e:
+            print("_initial_homing final reposition failed:", e)
+
 
     def open(self):
         """Try to open the shutter
@@ -247,6 +322,11 @@ class KST201_Shutter():
         """
         if self.connected:
             if self.stage and 'FW103' in self.stage.upper():
+                # always drive to the closed angle; if the internal counter
+                # erroneously believes we're already there, fall back to a
+                # homing operation which will physically rotate the wheel until
+                # the home sensor is seen (for filter wheels this effectively
+                # resets the encoder).
                 if self._move_to(self.closed_angle, 2000):
                     self.is_open = False
                 else:

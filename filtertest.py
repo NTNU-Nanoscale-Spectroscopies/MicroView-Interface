@@ -3,7 +3,9 @@ import sys
 import os
 
 # Directory where the DLL and Python wrapper are located
-sdk_path = os.path.abspath("dev/devices/filter/dlls/")
+# compute absolute path relative to this script so it works regardless of cwd
+base_dir = os.path.dirname(os.path.abspath(__file__))
+sdk_path = os.path.abspath(os.path.join(base_dir, "dev/devices/filter_wheel/dll_sdk"))
 
 # Add the directory to Python path so it can find FWxC_COMMAND_LIB.py
 sys.path.append(sdk_path)
@@ -16,7 +18,11 @@ os.chdir(sdk_path)
 try:
     from FWxC_COMMAND_LIB import *
 except OSError as ex:
+    import platform
     print("Library Load Warning:", ex)
+    print("Python architecture:", platform.architecture())
+    print("Make sure the DLL bitness matches your interpreter and that the"
+          " Visual C++ runtime is installed.")
     exit(1)
 
 def connect_and_configure_filter_wheel(serial_number):

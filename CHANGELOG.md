@@ -1,4 +1,16 @@
 # Changelog
+## [3.5.0] - 2026-03-11
+### <span style="color:green"> Added </span>
+- Dev : GM implemented
+- Dev : Power meter, PM16-401 implemented (GM)
+- Dev : MCM301 stage implemented (GM)
+- Dev : FW212 filter wheel implemented (GM)
+- Dev : Camera device: auto exposure time added (GM)
+- Dev : Rotation mount device for half wave plate (Thorlabs ELL14) added (GM)
+- Dev : Stage control device (Thorlabs MCM3001) added (LM)
+- Dev : GUI changes: splash screen and loading screen added
+- Dev : Raman spectroscopy microscope interface added (GM)
+
 ## [3.1.0] - 2026-02-01
 ### <span style="color:green"> Added </span>
 - Dev : Separated LM and GM

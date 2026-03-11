@@ -48,7 +48,11 @@ def load_image(size, light_filename, dark_filename=None, path="dev/images/"):
         print(f"Error loading image {dark_filename}: {e}")
         dark_image_data = None
         
-    return CTkImage(light_image_data, dark_image_data, size)
+    try:
+        return CTkImage(light_image_data, dark_image_data, size)
+    except ValueError:
+        # no image available, return None so callers can handle gracefully
+        return None
 
 
 img_microscope = load_image((150, 150), 'microscope_black.png', 'microscope_white.png')
