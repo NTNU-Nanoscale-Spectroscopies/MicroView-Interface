@@ -1162,9 +1162,9 @@ class PowerMeterFrame(CTkFrame):
     def on_closing(self):
         self._stop_update()
         # save active recording before closing
-        if self._recording:
+        if getattr(self, '_recording', False):
             self._finish_recording()
-        if self.connected_device:
+        if getattr(self, 'connected_device', None):
             try:
                 self.connected_device.stop()
                 self.connected_device.disconnect()
