@@ -1029,19 +1029,76 @@ class PowerMeterFrame(CTkFrame):
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Power [mW]')
 
-        # average lines for first/last 200 points (or fewer if data is short)
-        n_avg = min(200, len(p_arr))
-        if n_avg > 0:
-            vals_off = p_arr[:n_avg]
-            vals_on  = p_arr[-n_avg:]
-            time_off = t_arr[:n_avg]
-            time_on  = t_arr[-n_avg:]
+        # Try to detect an "off"->"on" step so we can compute a meaningful
+        # steady-state average for each region instead of hard-coded first/last
+        # 200-point segments.
+        avg_off = None
+        avg_on = None
+        delta = None
 
-            avg_off = np.mean(vals_off)
-            avg_on  = np.mean(vals_on)
+        if len(p_arr) >= 4:
+            diff = np.diff(p_arr)
+            # Find the largest upward step (laser turn-on)
+            step_idx = int(np.argmax(diff))
+            step_value = diff[step_idx]
 
-            ax.plot(time_off, avg_off * np.ones(n_avg), 'red', linewidth=2, label='_')
-            ax.plot(time_on,  avg_on  * np.ones(n_avg), 'green', linewidth=2, label='_')
+            if step_value > 0:
+                # Determine a threshold for steady state (1% of span or 1e-3 mW)
+                span = np.nanmax(p_arr) - np.nanmin(p_arr)
+                steady_thresh = max(abs(step_value) * 0.2, span * 0.01, 1e-3)
+
+                # Find steady region after turn-on by scanning from the end
+                large_changes = np.where(np.abs(diff) > steady_thresh)[0]
+                if len(large_changes) > 0:
+                    last_large = large_changes[-1]
+                    steady_start = max(step_idx + 1, last_large + 1)
+                else:
+                    steady_start = step_idx + 1
+                steady_start = min(steady_start, len(p_arr) - 1)
+
+                # Find steady region before turn-on by scanning from the start
+                if len(large_changes) > 0:
+                    first_large = large_changes[0]
+                    off_end = min(step_idx, first_large + 1)
+                else:
+                    off_end = step_idx
+                off_end = max(1, off_end)
+
+                if off_end >= 2 and (len(p_arr) - steady_start) >= 2:
+                    avg_off = np.mean(p_arr[:off_end])
+                    avg_on = np.mean(p_arr[steady_start:])
+                    delta = avg_on - avg_off
+
+                    ax.hlines(avg_off, t_arr[0], t_arr[off_end - 1], colors='red', linewidth=2, label='_')
+                    ax.hlines(avg_on, t_arr[steady_start], t_arr[-1], colors='green', linewidth=2, label='_')
+                    ax.axvline(t_arr[step_idx], color='gray', linestyle='--', linewidth=1)
+
+        # Fallback to previous behavior if we didn't find a good steady-state split
+        if avg_off is None or avg_on is None:
+            n_avg = min(200, len(p_arr))
+            if n_avg > 0:
+                vals_off = p_arr[:n_avg]
+                vals_on = p_arr[-n_avg:]
+                time_off = t_arr[:n_avg]
+                time_on = t_arr[-n_avg:]
+
+                avg_off = np.mean(vals_off)
+                avg_on = np.mean(vals_on)
+                delta = avg_on - avg_off
+
+                ax.plot(time_off, avg_off * np.ones(n_avg), 'red', linewidth=2, label='_')
+                ax.plot(time_on, avg_on * np.ones(n_avg), 'green', linewidth=2, label='_')
+
+        if delta is not None:
+            ax.text(
+                0.98,
+                0.95,
+                f"Δ = {delta:.3f} mW",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                bbox=dict(facecolor="white", alpha=0.6, edgecolor="none", pad=3),
+            )
 
         fig.tight_layout()
 

@@ -3,6 +3,9 @@ from customtkinter import Variable as CTkVariable, CTkOptionMenu
 from CTkToolTip import *
 from dev.debugHelp import debugp
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
+import json
+import os
+import sys
 from .notification import *
 from ..images.images import *
 from ..devices.camera.camera import *
@@ -15,6 +18,7 @@ from ..devices.filter_wheel.filterwheel import MyFilterWheel
 from ..devices.stage import *
 from ..devices.Stage.sim_stage import MySimStage
 from ..devices.Stage.mcm301_stage import MyMCM301Stage
+from ..autofocus import AutoFocus
 import threading
 import time
 from typing import TYPE_CHECKING
@@ -52,6 +56,7 @@ class QuickSetupFrame(CTkScrollableFrame):
         # CTkScrollableFrame wraps the real master in internal frames, so
         # self.master does NOT point to the app.  Store a direct reference.
         self._app = master
+        self.microscope = microscope
         self.device_entries = []
         # Headline
         title = CTkLabel(self, text="Devices", font=HEADLINE_FONT)
@@ -68,7 +73,20 @@ class QuickSetupFrame(CTkScrollableFrame):
 
             if isinstance(device, MyCamera):
                 master_frame = self.master.master.master.camera_frame
-                
+                # Autofocus button (enabled when both camera + stage are connected)
+                af_btn = CTkButton(frame, text="Autofocus", width=80, state="disabled",
+                                   command=lambda: self._run_autofocus())
+                CTkToolTip(af_btn, delay=0.2, message="Auto-focus via Z sweep")
+                af_settings = CTkButton(frame, text="", width=30, height=30,
+                                        image=img_cogwheel, fg_color="transparent",
+                                        state="disabled",
+                                        command=lambda: self._open_autofocus_settings())
+                CTkToolTip(af_settings, delay=0.2, message="Autofocus settings")
+                af_btn.pack(side="left", padx=(10, 2))
+                af_settings.pack(side="left", padx=(0, 5))
+                widgets.append((af_btn, "Autofocus"))
+                widgets.append((af_settings, "Autofocus"))
+
             elif isinstance(device, MySpectrometer):
                 master_frame = self.master.master.master.spectrometer_frame
                 entry = CTkEntry(frame, width=100, placeholder_text=device.integration_time/1000)
@@ -169,6 +187,28 @@ class QuickSetupFrame(CTkScrollableFrame):
                 widgets.append((home_btn,""))
                 widgets.append((auto_calibration_btn,""))
                 widgets.append((label,"NonDisableable"))
+
+                # --- Polarization preset buttons (only for Half Wave Plate) ---
+                if device.name == "Half Wave Plate":
+                    pol_x_btn = CTkButton(frame, text="X", width=30, state="disabled",
+                                          command=lambda: self.move_polarization_preset("horizontal"))
+                    CTkToolTip(pol_x_btn, delay=0.2, message="Move to Horizontal preset")
+                    pol_y_btn = CTkButton(frame, text="Y", width=30, state="disabled",
+                                          command=lambda: self.move_polarization_preset("vertical"))
+                    CTkToolTip(pol_y_btn, delay=0.2, message="Move to Vertical preset")
+                    pol_settings_btn = CTkButton(frame, text="", width=30, height=30,
+                                                 image=img_cogwheel, fg_color="transparent",
+                                                 state="disabled",
+                                                 command=lambda: self.open_polarization_preset_settings())
+                    CTkToolTip(pol_settings_btn, delay=0.2, message="Polarization Preset Settings")
+
+                    pol_x_btn.pack(side="left", padx=(10, 2))
+                    pol_y_btn.pack(side="left", padx=(2, 2))
+                    pol_settings_btn.pack(side="left", padx=(2, 5))
+
+                    widgets.append((pol_x_btn, ""))
+                    widgets.append((pol_y_btn, ""))
+                    widgets.append((pol_settings_btn, ""))
 
             #Add device to left hand tab and setup its switch
             self.device_entries.append(DeviceEntry(switch, device, widgets, master_frame))
@@ -620,6 +660,404 @@ class QuickSetupFrame(CTkScrollableFrame):
         print(wavelength)
         device.set_settings(wavelength, folder_name)
         self.popup.destroy()
+
+    # ------------------------------------------------------------------
+    # Polarization preset helpers (X / Y buttons + settings popup)
+    # ------------------------------------------------------------------
+
+    _POLARIZATION_PRESETS_DIR = os.path.join(
+        os.environ.get("APPDATA", os.path.expanduser("~")), "MicroView"
+    )
+    _POLARIZATION_PRESETS_PATH = os.path.join(
+        _POLARIZATION_PRESETS_DIR, "polarization_presets.json"
+    )
+
+    def _load_polarization_presets(self):
+        """Load polarization preset angles from disk."""
+        defaults = {
+            "laser_polarizer": {"horizontal": 0, "vertical": 90},
+            "hwp": {"horizontal": 0, "vertical": 45},
+        }
+        try:
+            path = os.path.normpath(self._POLARIZATION_PRESETS_PATH)
+            if os.path.isfile(path):
+                with open(path, "r") as f:
+                    data = json.load(f)
+                # merge with defaults so missing keys are filled in
+                for key in defaults:
+                    if key in data and isinstance(data[key], dict):
+                        defaults[key].update(data[key])
+                return defaults
+        except Exception as e:
+            debugp("PolarizationPresets", f"Failed to load presets: {e}")
+        return defaults
+
+    def _save_polarization_presets(self, presets):
+        """Persist polarization preset angles to disk."""
+        try:
+            os.makedirs(os.path.normpath(self._POLARIZATION_PRESETS_DIR), exist_ok=True)
+            path = os.path.normpath(self._POLARIZATION_PRESETS_PATH)
+            with open(path, "w") as f:
+                json.dump(presets, f, indent=4)
+        except Exception as e:
+            debugp("PolarizationPresets", f"Failed to save presets: {e}")
+
+    def _find_device_by_name(self, name):
+        """Find a device in the current microscope by its name."""
+        for dev in self.microscope.devices:
+            if dev.name == name:
+                return dev
+        return None
+
+    def open_polarization_preset_settings(self):
+        """Open a popup to configure polarization preset angles for Laser Polarizer and HWP."""
+        presets = self._load_polarization_presets()
+
+        popup = CTkToplevel(self)
+        popup.title("Polarization Preset Settings")
+        popup.geometry("400x220")
+        popup.resizable(False, False)
+
+        # --- Header row ---
+        CTkLabel(popup, text="", width=80).grid(row=0, column=0, padx=5, pady=(15, 5))
+        CTkLabel(popup, text="Laser Polarizer", font=("Arial", 14, "bold")).grid(row=0, column=1, padx=10, pady=(15, 5))
+        CTkLabel(popup, text="HWP", font=("Arial", 14, "bold")).grid(row=0, column=2, padx=10, pady=(15, 5))
+
+        # --- Horizontal row ---
+        CTkLabel(popup, text="Horizontal", anchor="w").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+        lp_h_entry = CTkEntry(popup, width=100)
+        lp_h_entry.grid(row=1, column=1, padx=10, pady=5)
+        lp_h_entry.insert(0, str(presets["laser_polarizer"]["horizontal"]))
+
+        hwp_h_entry = CTkEntry(popup, width=100)
+        hwp_h_entry.grid(row=1, column=2, padx=10, pady=5)
+        hwp_h_entry.insert(0, str(presets["hwp"]["horizontal"]))
+
+        # --- Vertical row ---
+        CTkLabel(popup, text="Vertical", anchor="w").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        lp_v_entry = CTkEntry(popup, width=100)
+        lp_v_entry.grid(row=2, column=1, padx=10, pady=5)
+        lp_v_entry.insert(0, str(presets["laser_polarizer"]["vertical"]))
+
+        hwp_v_entry = CTkEntry(popup, width=100)
+        hwp_v_entry.grid(row=2, column=2, padx=10, pady=5)
+        hwp_v_entry.insert(0, str(presets["hwp"]["vertical"]))
+
+        # --- Save button ---
+        def _save():
+            try:
+                new_presets = {
+                    "laser_polarizer": {
+                        "horizontal": float(lp_h_entry.get()),
+                        "vertical": float(lp_v_entry.get()),
+                    },
+                    "hwp": {
+                        "horizontal": float(hwp_h_entry.get()),
+                        "vertical": float(hwp_v_entry.get()),
+                    },
+                }
+            except ValueError:
+                messagebox.showerror("Invalid Input", "All fields must be valid numbers.")
+                return
+            self._save_polarization_presets(new_presets)
+            self.notification("Polarization presets saved", color="#1a8300")
+            popup.destroy()
+
+        btn_frame = CTkFrame(popup, fg_color="transparent")
+        btn_frame.grid(row=3, column=0, columnspan=3, pady=15, sticky="e", padx=10)
+        CTkButton(btn_frame, text="Save", width=80, command=_save).pack(side="right")
+
+        popup.transient(self)
+        popup.grab_set()
+
+    def move_polarization_preset(self, direction):
+        """Move the Laser Polarizer and HWP to preset angles.
+
+        Parameters
+        ----------
+        direction : str
+            Either ``"horizontal"`` or ``"vertical"``.
+        """
+        presets = self._load_polarization_presets()
+        lp_angle = presets["laser_polarizer"].get(direction, 0)
+        hwp_angle = presets["hwp"].get(direction, 0)
+
+        laser_plzr = self._find_device_by_name("Laser-Plzr")
+        hwp_device = self._find_device_by_name("Half Wave Plate")
+
+        if laser_plzr and not laser_plzr.connected:
+            self.notification(f"Laser-Plzr is not connected", color="#8e0101")
+            return
+        if hwp_device and not hwp_device.connected:
+            self.notification(f"Half Wave Plate is not connected", color="#8e0101")
+            return
+        if not laser_plzr and not hwp_device:
+            self.notification("No polarization devices found", color="#8e0101")
+            return
+
+        label = "Horizontal" if direction == "horizontal" else "Vertical"
+
+        def _move():
+            try:
+                if laser_plzr and laser_plzr.connected:
+                    laser_plzr.set_absolute_angle(lp_angle)
+                if hwp_device and hwp_device.connected:
+                    hwp_device.set_absolute_angle(hwp_angle)
+                self.after(0, lambda: self.notification(
+                    f"Moved to {label} preset  (LP: {lp_angle}°, HWP: {hwp_angle}°)", color="#1a8300"))
+            except Exception as e:
+                self.after(0, lambda: self.notification(
+                    f"Error moving to {label} preset: {e}", color="#8e0101"))
+
+        threading.Thread(target=_move, daemon=True).start()
+
+    # ── Autofocus ─────────────────────────────────────────────────────
+
+    # Default parameters (shared across popup opens)
+    _af_params = {
+        'sweep_range_mm': 0.1,
+        'coarse_step_mm': 0.01,
+        'fine_step_mm': 0.001,
+        'settle_time_ms': 300,
+    }
+
+    def _find_stage(self):
+        """Return the first stage device in the current microscope."""
+        for device in self.microscope.devices:
+            if isinstance(device, (MyStage, MySimStage, MyMCM301Stage)):
+                return device
+        return None
+
+    def _run_autofocus(self):
+        """Start the autofocus sweep with current parameters."""
+        # Check camera
+        camera_frame = getattr(self._app, 'camera_frame', None)
+        if camera_frame is None or not getattr(camera_frame, 'camera', None):
+            self.notification("No camera available", color="#8e0101")
+            return
+        if not getattr(camera_frame.camera, 'connected', False):
+            self.notification("Camera not connected", color="#8e0101")
+            return
+
+        # Check stage
+        stage = self._find_stage()
+        if stage is None:
+            self.notification("No stage found for this microscope", color="#8e0101")
+            return
+        if not getattr(stage, 'connected', False):
+            self.notification("Stage not connected", color="#8e0101")
+            return
+
+        # Prevent double-start
+        if getattr(self, '_af_instance', None) is not None:
+            self.notification("Autofocus already running", color="#8e0101")
+            return
+
+        p = self._af_params
+        sweep_range = p['sweep_range_mm']
+        coarse_step = p['coarse_step_mm']
+        fine_step = p['fine_step_mm']
+        settle_s = p['settle_time_ms'] / 1000.0
+
+        # Clamp sweep to stage safety limit
+        from dev.autofocus import _get_stage_safety_limit_mm
+        safety = _get_stage_safety_limit_mm(stage)
+        if safety is not None and sweep_range > safety:
+            sweep_range = safety
+            debugp("AutoFocus",
+                   f"Sweep range reduced to ±{safety:.3f} mm (stage limit)")
+
+        self.notification("Autofocus started…", color="#006bd2")
+
+        # Disable the autofocus button during sweep
+        self._set_af_buttons_state("disabled")
+
+        def _on_progress(step, total, z_mm, score):
+            pass  # silent — the user sees the live camera feed moving
+
+        def _on_complete(best_z, best_score):
+            def _done():
+                self._af_instance = None
+                self._set_af_buttons_state("normal")
+                self.notification(
+                    f"Autofocus done: Z={best_z:.4f} mm", color="#1a8300")
+            self.after(0, _done)
+
+        def _on_error(exc):
+            def _err():
+                self._af_instance = None
+                self._set_af_buttons_state("normal")
+                self.notification(
+                    f"Autofocus failed: {exc}", color="#8e0101")
+            self.after(0, _err)
+
+        # Resolve save location for the focus-curve CSV.  Lives inside
+        # the user's currently-active experiment folder so it sits next
+        # to the rest of the run's data.
+        _fs = None
+        try:
+            _node = self.master
+            for _ in range(6):
+                if not _node:
+                    break
+                if hasattr(_node, "file_system"):
+                    _fs = _node.file_system
+                    break
+                if hasattr(_node, "spectrometer_frame") and getattr(_node, "spectrometer_frame", None) \
+                        and hasattr(_node.spectrometer_frame, "file_system"):
+                    _fs = _node.spectrometer_frame.file_system
+                    break
+                _node = getattr(_node, "master", None)
+        except Exception:
+            _fs = None
+
+        _save_dir = _fs.get_backup_directory() if _fs is not None else None
+        if _save_dir is None:
+            debugp("AutoFocus",
+                   "Warning: file_system not found; focus curve will NOT be saved.")
+        else:
+            debugp("AutoFocus", f"Focus curve will save under {_save_dir}\\Autofocus")
+
+        self._af_instance = AutoFocus(
+            camera_frame=camera_frame,
+            stage=stage,
+            sweep_range_mm=sweep_range,
+            coarse_step_mm=coarse_step,
+            fine_step_mm=fine_step,
+            settle_time_s=settle_s,
+            save_curve_dir=_save_dir,
+            on_progress=_on_progress,
+            on_complete=_on_complete,
+            on_error=_on_error,
+        )
+
+        threading.Thread(target=self._af_instance.run, daemon=True).start()
+
+    def _set_af_buttons_state(self, state):
+        """Enable or disable all autofocus widgets in the device panel."""
+        for entry in self.device_entries:
+            for widget, wtype in entry.widgets:
+                if wtype == "Autofocus":
+                    try:
+                        widget.configure(state=state)
+                    except Exception:
+                        pass
+
+    def _open_autofocus_settings(self):
+        """Open a popup to configure autofocus sweep parameters."""
+        # Check stage exists so we can display the safety limit
+        stage = self._find_stage()
+
+        if getattr(self, '_af_settings_popup', None):
+            try:
+                self._af_settings_popup.lift()
+            except Exception:
+                pass
+            return
+
+        self._af_settings_popup = CTkToplevel(self._app)
+        self._af_settings_popup.title("Autofocus Settings")
+        self._af_settings_popup.geometry("380x300")
+        self._af_settings_popup.resizable(False, False)
+        self._af_settings_popup.protocol(
+            "WM_DELETE_WINDOW", self._close_af_settings)
+        try:
+            self._af_settings_popup.attributes("-topmost", True)
+            self._af_settings_popup.transient(self._app)
+            self.after(50, lambda: self._af_settings_popup.attributes(
+                "-topmost", False))
+        except Exception:
+            pass
+
+        body = CTkFrame(self._af_settings_popup)
+        body.pack(fill="both", expand=True, padx=16, pady=12)
+
+        headline = CTkLabel(body, text="Autofocus parameters",
+                            font=("Arial", 16))
+        headline.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
+
+        # Show safety limit hint
+        from dev.autofocus import _get_stage_safety_limit_mm
+        safety = _get_stage_safety_limit_mm(stage) if stage else None
+        limit_hint = f"  (stage limit: ±{safety:.1f} mm)" if safety else ""
+
+        p = self._af_params
+
+        CTkLabel(body, text="Sweep range ±(mm):").grid(
+            row=1, column=0, sticky="w", pady=6)
+        range_entry = CTkEntry(body, width=140)
+        range_entry.insert(0, str(p['sweep_range_mm']))
+        range_entry.grid(row=1, column=1, sticky="e", pady=6)
+
+        CTkLabel(body, text="Coarse step (mm):").grid(
+            row=2, column=0, sticky="w", pady=6)
+        coarse_entry = CTkEntry(body, width=140)
+        coarse_entry.insert(0, str(p['coarse_step_mm']))
+        coarse_entry.grid(row=2, column=1, sticky="e", pady=6)
+
+        CTkLabel(body, text="Fine step (mm):").grid(
+            row=3, column=0, sticky="w", pady=6)
+        fine_entry = CTkEntry(body, width=140)
+        fine_entry.insert(0, str(p['fine_step_mm']))
+        fine_entry.grid(row=3, column=1, sticky="e", pady=6)
+
+        CTkLabel(body, text="Settle time (ms):").grid(
+            row=4, column=0, sticky="w", pady=6)
+        settle_entry = CTkEntry(body, width=140)
+        settle_entry.insert(0, str(p['settle_time_ms']))
+        settle_entry.grid(row=4, column=1, sticky="e", pady=6)
+
+        if limit_hint:
+            info = CTkLabel(body, text=limit_hint, font=("Arial", 11),
+                            text_color="grey")
+            info.grid(row=5, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+        footer = CTkFrame(self._af_settings_popup, fg_color="transparent")
+        footer.pack(fill="x", padx=16, pady=(8, 12))
+
+        def _save():
+            try:
+                sr = float(range_entry.get())
+                cs = float(coarse_entry.get())
+                fs = float(fine_entry.get())
+                st = float(settle_entry.get())
+            except (ValueError, TypeError):
+                messagebox.showerror("Invalid input",
+                                     "Please enter valid numeric values.",
+                                     parent=self._af_settings_popup)
+                return
+            if sr <= 0 or cs <= 0 or fs <= 0 or st <= 0:
+                messagebox.showerror("Invalid input",
+                                     "All values must be positive.",
+                                     parent=self._af_settings_popup)
+                return
+            if fs >= cs:
+                messagebox.showerror("Invalid input",
+                                     "Fine step must be smaller than coarse step.",
+                                     parent=self._af_settings_popup)
+                return
+            self._af_params['sweep_range_mm'] = sr
+            self._af_params['coarse_step_mm'] = cs
+            self._af_params['fine_step_mm'] = fs
+            self._af_params['settle_time_ms'] = st
+            self.notification("Autofocus settings saved", color="#1a8300")
+            self._close_af_settings()
+
+        CTkButton(footer, text="Cancel", width=100,
+                  command=self._close_af_settings).pack(side="left")
+        CTkButton(footer, text="Save", width=100,
+                  command=_save).pack(side="right")
+
+        self._af_settings_popup.focus_force()
+
+    def _close_af_settings(self):
+        """Close the autofocus settings popup."""
+        if getattr(self, '_af_settings_popup', None):
+            try:
+                self._af_settings_popup.destroy()
+            except Exception:
+                pass
+            self._af_settings_popup = None
 
     def open_stage_settings(self, device):
         # make the popup a child of the main app window

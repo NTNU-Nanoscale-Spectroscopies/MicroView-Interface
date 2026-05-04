@@ -10,6 +10,8 @@
 - Dev : Stage control device (Thorlabs MCM3001) added (LM)
 - Dev : GUI changes: splash screen and loading screen added
 - Dev : Raman spectroscopy microscope interface added (GM)
+- Dev : Simple autofocus for camera implemented
+- Dev : Power meter graphing bug resolved
 
 ## [3.1.0] - 2026-02-01
 ### <span style="color:green"> Added </span>

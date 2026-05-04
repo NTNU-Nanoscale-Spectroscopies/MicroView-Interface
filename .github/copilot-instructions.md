@@ -50,4 +50,4 @@ Purpose: Help AI coding agents be immediately productive editing, building, and 
   - GUI patterns: `dev/widgets/camera_frame.py` and `dev/widgets/spectrometer_frame.py` show frame lifecycle and cleanup (`on_closing`).
   - File naming and export: `dev/file_system.py` contains the backup and filename conventions; reference it when adding export features.
 
-If anything here is unclear or you'd like more detail (examples for adding a device driver, updating the spec, or a starter test harness), tell me which area to expand and I will iterate.
+

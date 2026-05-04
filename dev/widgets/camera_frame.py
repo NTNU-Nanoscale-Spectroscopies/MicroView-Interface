@@ -94,6 +94,7 @@ class CameraFrame(CTkFrame):
             self.exposure_var.trace_add("write", self.validate_input)
             self.exposure_display = CTkEntry(self.exposure_frame, textvariable=self.exposure_var, width=60)
             self.exposure_display.grid(row=0, column=1, padx=(5, 5), sticky="w")
+            self.exposure_display.bind("<FocusIn>", self._on_exposure_entry_focus)
 
             self.exposure_label = CTkLabel(self.exposure_frame, text="ms")
             self.exposure_label.grid(row=0, column=2, padx=(1, 5), sticky="w")
@@ -170,6 +171,13 @@ class CameraFrame(CTkFrame):
                 # Run software auto-exposure adjustment if enabled
                 if getattr(self.camera, "auto_exposure_enabled", False):
                     self.camera.auto_adjust_exposure(self.current_image)
+                    # Sync the UI indicators with the current auto-adjusted exposure
+                    try:
+                        current_ms = round(self.camera.camera.exposure_time_us / 1000)
+                        self.exposure_slider.set(current_ms)
+                        self.exposure_display.configure(textvariable=StringVar(value=str(current_ms)))
+                    except Exception:
+                        pass
 
             except queue.Empty:
                 pass
@@ -226,13 +234,19 @@ class CameraFrame(CTkFrame):
             
             
     def on_exposure_slider_updated(self, value):
-        """Updates the entry box and sets the camera exposure
+        """Updates the entry box and sets the camera exposure.
+        Also disables auto-exposure when the user manually moves the slider.
         
         Parameters
         ------------
         value : `float`
             Exposure value in milliseconds
         """
+        # Disable auto-exposure on manual slider interaction
+        if self.auto_exposure_var.get():
+            self.auto_exposure_var.set(False)
+            self.on_auto_exposure_toggled()
+
         val = round(value)
         self.exposure_display.configure(textvariable = StringVar(value=str(val)))
         self.on_exposure_updated(val)
@@ -296,3 +310,10 @@ class CameraFrame(CTkFrame):
         """Called when the auto-exposure checkbox is toggled."""
         enabled = self.auto_exposure_var.get()
         self.camera.set_auto_exposure(enabled)
+
+
+    def _on_exposure_entry_focus(self, event=None):
+        """Disable auto-exposure when the user clicks into the exposure entry to type."""
+        if self.auto_exposure_var.get():
+            self.auto_exposure_var.set(False)
+            self.on_auto_exposure_toggled()

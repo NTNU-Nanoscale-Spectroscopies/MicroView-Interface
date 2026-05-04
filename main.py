@@ -16,7 +16,7 @@
 # Developpers :                                                               #
 # - Noah JACOB                                                                #
 # - Oliver MINEAU  
-# - Eirik Lu                                                          #
+# - Eirik LU                                                                  #
 #                                                                             #
 ###############################################################################
 
@@ -92,14 +92,14 @@ from dev.devices.power_meter.sim_power_meter import MySimPowerMeter
 version = "V3.5.0"
 
 # Set the size of the application's main window (width, height)
-size = (1200,700)
+size = (2560,1440)
 
 # Set the duration for which notifications will remain visible (in seconds)
 visible_notif_time = 3
 
 # Specify the directory where data backups will be saved
-backup_directory = r"C:\Users\A068\Documents\Data\Default"
-#backup_directory = r"C:\Users\el-ei\Documents\Masterproject\Backup data"
+#backup_directory = r"C:\Users\A068\Documents\Data\Default"
+backup_directory = r"C:\Users\el-ei\Documents\Masterproject\Backup data"
 
 # Create an instance of a microscope setup 28939
 # Remove 'Sim' from the class names to connect to real devices 

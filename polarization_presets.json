@@ -1,0 +1,10 @@
+{
+    "laser_polarizer": {
+        "horizontal": 0,
+        "vertical": 90
+    },
+    "hwp": {
+        "horizontal": 0,
+        "vertical": 45
+    }
+}

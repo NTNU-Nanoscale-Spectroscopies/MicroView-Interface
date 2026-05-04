@@ -52,7 +52,11 @@ class MyApp(CTk):
         self.popup = None
         self.swicth_theme_mode()
         self.set_windows_scale()
-        self.center_window(size[0], size[1])
+        # Use 80% of screen size as the restored-window geometry so it
+        # looks correct on any monitor when the user un-maximises.
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        self.center_window(int(sw * 0.8), int(sh * 0.8))
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         # ensure the safety move is executed even if the window is closed non‑interactively
@@ -67,6 +71,10 @@ class MyApp(CTk):
         self._map_resume_id = None
 
         self.menu()
+
+        # Defer maximizing until after the window is fully built and mapped,
+        # otherwise CTk/geometry calls during menu() can reset the state.
+        self.after(0, lambda: self.state("zoomed"))
 
     def menu(self):
         """Displays the application's main menu
