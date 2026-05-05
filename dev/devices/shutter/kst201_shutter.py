@@ -76,57 +76,71 @@ class KST201_Shutter():
                 if not self.shutter.IsSettingsInitialized():
                     self.connected = False
                     return self.connected
-                
+
+            # Load motor configuration BEFORE enabling/homing so unit scaling
+            # (degrees vs raw motor revolutions) is correct from the first move.
+            # When a stage is supplied we force `DeviceSettingsName` instead of
+            # relying on whatever is cached in the local Kinesis settings file:
+            # on a fresh lab PC the file may not list FW103M, in which case the
+            # controller falls back to generic stepper units and `MoveTo(60)`
+            # turns the motor 60 revolutions instead of 60 degrees -- the
+            # "spins forever" symptom we hit on the lab machine.
+            if self.stage:
+                settings_option = DeviceConfiguration.DeviceSettingsUseOptionType.UseConfiguredSettings
+            else:
+                settings_option = DeviceConfiguration.DeviceSettingsUseOptionType.UseFileSettings
+            device_config = self.shutter.LoadMotorConfiguration(self.shutter.DeviceID, settings_option)
+
+            if self.stage:
+                applied = False
+                try:
+                    if hasattr(device_config, 'DeviceSettingsName'):
+                        device_config.DeviceSettingsName = self.stage
+                        if hasattr(device_config, 'UpdateCurrentConfiguration'):
+                            device_config.UpdateCurrentConfiguration()
+                        applied = True
+                        print(f"Applied DeviceSettingsName: {self.stage}")
+                except Exception as e:
+                    print("Could not set DeviceSettingsName:", e)
+
+                # Fallbacks for older/alternate Kinesis bindings.
+                if not applied:
+                    try:
+                        if hasattr(device_config, 'Stage'):
+                            device_config.Stage = self.stage
+                            print(f"Applied stage to device_config.Stage: {self.stage}")
+                        elif hasattr(device_config, 'StageType'):
+                            device_config.StageType = self.stage
+                            print(f"Applied stage to device_config.StageType: {self.stage}")
+                    except Exception as e:
+                        print("Stage fallback assignment failed:", e)
+
+                if hasattr(self.shutter, 'SetMotorConfigurationByStage'):
+                    try:
+                        self.shutter.SetMotorConfigurationByStage(self.shutter.DeviceID, self.stage)
+                        print("Called SetMotorConfigurationByStage on controller.")
+                    except Exception as e:
+                        print("SetMotorConfigurationByStage failed (non-fatal):", e)
+
             self.shutter.StartPolling(250)
             time.sleep(0.25)
             self.shutter.EnableDevice()
             time.sleep(0.5)
 
-            # Home the device after enabling so controller is at 0 degrees by default
+            # Home the device after motor configuration so 0 is interpreted in
+            # the configured stage's units (degrees for FW103M).
             try:
                 if hasattr(self.shutter, "Home"):
-                    # allow the home call to complete (best-effort)
                     self.shutter.Home(5000)
                     self.is_open = False
                     print("KST201: Homed after connect (requested).")
             except Exception as e:
                 print("KST201: Home after connect failed:", e)
 
-            use_file_settings = DeviceConfiguration.DeviceSettingsUseOptionType.UseFileSettings
-            device_config = self.shutter.LoadMotorConfiguration(self.shutter.DeviceID, use_file_settings)
             home_params = self.shutter.GetHomingParams()
             print(f'Homing Velocity: {home_params.Velocity}')
-            self.close()
             device_vel_params = self.shutter.GetVelocityParams()
             print(f'Acceleration: {device_vel_params.Acceleration}', f'Velocity: {device_vel_params.MaxVelocity}')
-
-            # Attempt to set stage type if the user provided one (best-effort)
-            if self.stage:
-                try:
-                    # Many Kinesis/Thorlabs objects don't expose an assignable stage field;
-                    # try a few reasonable possibilities without risking failure of the whole connect.
-                    if hasattr(device_config, 'Stage'):
-                        try:
-                            device_config.Stage = self.stage
-                            print(f"Applied stage to device_config.Stage: {self.stage}")
-                        except Exception as e:
-                            print("Could not set device_config.Stage:", e)
-                    elif hasattr(device_config, 'StageType'):
-                        try:
-                            device_config.StageType = self.stage
-                            print(f"Applied stage to device_config.StageType: {self.stage}")
-                        except Exception as e:
-                            print("Could not set device_config.StageType:", e)
-
-                    # If controller exposes a helper, try that too.
-                    if hasattr(self.shutter, 'SetMotorConfigurationByStage'):
-                        try:
-                            self.shutter.SetMotorConfigurationByStage(self.shutter.DeviceID, self.stage)
-                            print("Called SetMotorConfigurationByStage on controller.")
-                        except Exception as e:
-                            print("SetMotorConfigurationByStage failed:", e)
-                except Exception as e:
-                    print("Stage selection attempt failed:", e)
 
             self.connected = True
             # Perform a dedicated homing/open cycle at startup so that the
