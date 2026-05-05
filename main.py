@@ -98,8 +98,8 @@ size = (2560,1440)
 visible_notif_time = 3
 
 # Specify the directory where data backups will be saved
-#backup_directory = r"C:\Users\A068\Documents\Data\Default"
-backup_directory = r"C:\Users\el-ei\Documents\Masterproject\Backup data"
+backup_directory = r"C:\Users\A068\Documents\Data\Default"
+#backup_directory = r"C:\Users\el-ei\Documents\Masterproject\Backup data"
 
 # Create an instance of a microscope setup 28939
 # Remove 'Sim' from the class names to connect to real devices 
