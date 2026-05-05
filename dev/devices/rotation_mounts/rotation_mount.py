@@ -8,10 +8,87 @@ try:
     import elliptec
 except ImportError:
     elliptec = None
+try:
+    import serial as _pyserial
+    import serial.tools.list_ports as _listports
+except ImportError:
+    _pyserial = None
+    _listports = None
 from CTkToolTip import *
 import numpy as np
 from dev.devices.rotation_mounts.auto_calibration import AutoCalibrate
 import os
+
+
+# ---------------------------------------------------------------------------
+# Plug-and-play port resolution for Thorlabs Elliptec rotation mounts.
+#
+# Each Elliptec mount has a unique device serial number (printed on the housing
+# and shown in the Thorlabs ELLO software). The COM port assigned to the mount
+# by Windows can change whenever the USB cable is moved between ports, so we
+# look the COM port up at connect-time by scanning available USB serial ports
+# and matching each device's reported serial number.
+#
+# Results are cached so we only scan once per app session unless the cache
+# becomes stale (e.g. a device was unplugged and replugged on a different port).
+# ---------------------------------------------------------------------------
+
+_port_resolution_cache = {}      # mount serial (str) -> COM port name (str)
+_port_resolution_lock = threading.RLock()
+
+
+def _scan_elliptec_mounts():
+    """Probe every available USB serial port for an Elliptec mount and return
+    a dict mapping device serial number -> COM port name."""
+    found = {}
+    if elliptec is None or _listports is None or _pyserial is None:
+        return found
+
+    for info in _listports.comports():
+        if not info.serial_number:
+            continue
+        port = info.device
+        # Pre-check that the port is openable. elliptec.Controller calls
+        # sys.exit() on serial.SerialException, so we have to filter busy/
+        # invalid ports out before handing them over.
+        try:
+            probe = _pyserial.Serial(port, timeout=0.3, write_timeout=0.3)
+            probe.close()
+        except (OSError, _pyserial.SerialException):
+            continue
+
+        controller = None
+        try:
+            controller = elliptec.Controller(port, debug=False)
+            rotator = elliptec.Rotator(controller, debug=False)
+            found[str(rotator.serial_no).strip()] = port
+        except BaseException:
+            # Not an Elliptec device, or its info couldn't be read.
+            pass
+        finally:
+            if controller is not None:
+                try:
+                    controller.close_connection()
+                except Exception:
+                    pass
+
+    return found
+
+
+def _resolve_elliptec_port(mount_serial):
+    """Return the COM port currently hosting the Elliptec mount with the given
+    serial, or None if it can't be found. A scan is only triggered when the
+    serial isn't already in the cache."""
+    target = str(mount_serial).strip()
+    with _port_resolution_lock:
+        if target not in _port_resolution_cache:
+            _port_resolution_cache.update(_scan_elliptec_mounts())
+        return _port_resolution_cache.get(target)
+
+
+def _invalidate_elliptec_port(mount_serial):
+    with _port_resolution_lock:
+        _port_resolution_cache.pop(str(mount_serial).strip(), None)
 
 
 class MyRotationMount():
@@ -25,7 +102,11 @@ class MyRotationMount():
         name : `str`
             Visible name of this device in the graphical interface.
         serial : `str`
-            The unique device serial number enabling communication check the windows device manager to find corresponding COM ports .
+            Either the Thorlabs Elliptec device serial number (printed on the
+            housing and shown in ELLO software, e.g. "11401261") or a literal
+            COM port name (e.g. "COM6"). When a device serial is given, the
+            COM port is discovered automatically at connect-time so the mount
+            keeps working when its USB cable is moved between ports.
         associated_spectrometer : optional
             A spectrometer that may be linked to this device to allow auto calibration.
         enable : `bool`, optional
@@ -57,15 +138,29 @@ class MyRotationMount():
             Whether communication is successfully established.
         """
 
-        if self.connected == False:
-            try:
-                self.controller = elliptec.Controller(self.serial)
-                self.rotation_mount = elliptec.Rotator(self.controller)
-                self.home()
-                self.connected = True
-            except:
-                return False
-        
+        if self.connected:
+            return True
+        if elliptec is None:
+            return False
+
+        serial_str = str(self.serial).strip()
+        is_com_port = serial_str.upper().startswith("COM")
+        port = serial_str if is_com_port else _resolve_elliptec_port(serial_str)
+        if port is None:
+            return False
+
+        try:
+            self.controller = elliptec.Controller(port, debug=False)
+            self.rotation_mount = elliptec.Rotator(self.controller, debug=False)
+            self.home()
+            self.connected = True
+        except BaseException:
+            # The cached port may be stale (cable moved between ports). Drop
+            # it so the next connect() triggers a fresh scan.
+            if not is_com_port:
+                _invalidate_elliptec_port(serial_str)
+            return False
+
         return self.connected
 
     def disconnect(self):

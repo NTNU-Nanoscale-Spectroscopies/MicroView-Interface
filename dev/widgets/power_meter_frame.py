@@ -1084,6 +1084,7 @@ class PowerMeterFrame(CTkFrame):
             # convert to ms / W for the CSV
             t_ms = t_arr * 1000.0
             p_w  = p_arr / 1000.0
+            steady = self._calculate_steady_state_stats(times, powers)
 
             # Gather metadata for the header
             wl = getattr(self, "wl_var", None)
@@ -1096,6 +1097,9 @@ class PowerMeterFrame(CTkFrame):
             if self.connected_device:
                 device_name = getattr(self.connected_device, "name", "")
                 device_serial = getattr(self.connected_device, "serial", "")
+            auto_range = "N/A"
+            if hasattr(self, "auto_range_var"):
+                auto_range = "On" if self.auto_range_var.get() else "Off"
 
             # Build exactly 23 header lines (including the column-name line)
             header_lines = [
@@ -1107,8 +1111,10 @@ class PowerMeterFrame(CTkFrame):
                 f"# Samples: {n_samples}",
                 f"# Duration (s): {duration_s:.4f}",
                 f"# Zero offset (mW): {self._zero_offset:.6f}",
-                f"# Auto-range: {getattr(self, 'auto_range_var', 'N/A')}",
-                f"#",
+                f"# Auto-range: {auto_range}",
+                f"# Steady state laser off average (mW): {self._format_optional_float(steady['avg_off_mw'])}",
+                f"# Steady state laser on average (mW): {self._format_optional_float(steady['avg_on_mw'])}",
+                f"# Steady state delta on-off (mW): {self._format_optional_float(steady['delta_mw'])}",
                 f"# Data format:",
                 f"#   Column 0 – Time in milliseconds (ms)",
                 f"#   Column 1 – Power in watts (W)",
@@ -1119,8 +1125,6 @@ class PowerMeterFrame(CTkFrame):
                 f"#   power_mW = data[:,1] * 1000",
                 f"#",
                 f"# --------------------------------------------------",
-                f"#",
-                f"#",
                 f"Time (ms),Power (W)",
             ]
 
@@ -1142,81 +1146,135 @@ class PowerMeterFrame(CTkFrame):
         except Exception as e:
             debugp("PowerMeterFrame", f"Plot image error: {e}")
 
+    @staticmethod
+    def _format_optional_float(value):
+        """Format optional numeric metadata for the CSV header."""
+        if value is None:
+            return "N/A"
+        return f"{value:.6f}"
+
+    @staticmethod
+    def _mean_or_none(values):
+        values = np.asarray(values, dtype=float)
+        values = values[np.isfinite(values)]
+        if len(values) == 0:
+            return None
+        return float(np.mean(values))
+
+    def _calculate_steady_state_stats(self, times: list, powers: list) -> dict:
+        """Calculate laser-off/on steady-state averages in internal mW units.
+
+        The returned index ranges are half-open and are used by the saved plot
+        so the CSV metadata and plotted horizontal lines describe the same
+        samples.
+        """
+        p_arr = np.asarray(powers, dtype=float)
+        n_samples = min(len(times), len(p_arr))
+        p_arr = p_arr[:n_samples]
+        result = {
+            "avg_off_mw": None,
+            "avg_on_mw": None,
+            "delta_mw": None,
+            "off_start_idx": None,
+            "off_end_idx": None,
+            "on_start_idx": None,
+            "on_end_idx": None,
+            "step_idx": None,
+        }
+
+        if n_samples == 0:
+            return result
+
+        def set_stats(off_start, off_end, on_start, on_end, step_idx=None):
+            avg_off = self._mean_or_none(p_arr[off_start:off_end])
+            avg_on = self._mean_or_none(p_arr[on_start:on_end])
+            if avg_off is None or avg_on is None:
+                return False
+            result.update({
+                "avg_off_mw": avg_off,
+                "avg_on_mw": avg_on,
+                "delta_mw": avg_on - avg_off,
+                "off_start_idx": off_start,
+                "off_end_idx": off_end,
+                "on_start_idx": on_start,
+                "on_end_idx": on_end,
+                "step_idx": step_idx,
+            })
+            return True
+
+        if n_samples >= 4:
+            diff = np.diff(p_arr)
+            finite_diff = np.where(np.isfinite(diff), diff, -np.inf)
+            step_idx = int(np.argmax(finite_diff))
+            step_value = finite_diff[step_idx]
+
+            if np.isfinite(step_value) and step_value > 0:
+                try:
+                    span = np.nanmax(p_arr) - np.nanmin(p_arr)
+                except ValueError:
+                    span = 0.0
+                if not np.isfinite(span):
+                    span = 0.0
+
+                steady_thresh = max(abs(step_value) * 0.2, span * 0.01, 1e-3)
+                large_changes = np.where(np.abs(diff) > steady_thresh)[0]
+
+                if len(large_changes) > 0:
+                    steady_start = max(step_idx + 1, large_changes[-1] + 1)
+                    off_end = min(step_idx, large_changes[0] + 1)
+                else:
+                    steady_start = step_idx + 1
+                    off_end = step_idx
+
+                steady_start = min(steady_start, n_samples - 1)
+                off_end = max(1, off_end)
+
+                if off_end >= 2 and (n_samples - steady_start) >= 2:
+                    if set_stats(0, off_end, steady_start, n_samples, step_idx):
+                        return result
+
+        n_avg = min(200, n_samples)
+        if n_avg > 0:
+            set_stats(0, n_avg, n_samples - n_avg, n_samples)
+
+        return result
+
     def _save_plot_image(self, csv_path: str, times: list, powers: list):
         """Generate a power-vs-time plot image matching the standard analysis format.
 
         ``times`` are in seconds and ``powers`` in mW (internal units).
-        The plot mirrors the external analysis workflow: convert to seconds
-        on the x-axis and mW on the y-axis, then overlay average lines for
-        the first and last 200 samples.
+        The plotted horizontal lines use the same steady-state averages saved
+        in the CSV header.
         """
-        t_arr = np.array(times)    # already in seconds
-        p_arr = np.array(powers)   # already in mW
+        n_samples = min(len(times), len(powers))
+        t_arr = np.asarray(times[:n_samples], dtype=float)    # already in seconds
+        p_arr = np.asarray(powers[:n_samples], dtype=float)   # already in mW
 
         fig, ax = plt.subplots(1, 1, figsize=(5, 3))
         ax.plot(t_arr, p_arr, 'skyblue')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Power [mW]')
 
-        # Try to detect an "off"->"on" step so we can compute a meaningful
-        # steady-state average for each region instead of hard-coded first/last
-        # 200-point segments.
-        avg_off = None
-        avg_on = None
-        delta = None
+        steady = self._calculate_steady_state_stats(times, powers)
+        avg_off = steady["avg_off_mw"]
+        avg_on = steady["avg_on_mw"]
+        delta = steady["delta_mw"]
 
-        if len(p_arr) >= 4:
-            diff = np.diff(p_arr)
-            # Find the largest upward step (laser turn-on)
-            step_idx = int(np.argmax(diff))
-            step_value = diff[step_idx]
+        if avg_off is not None and avg_on is not None and len(t_arr) > 0:
+            off_start = steady["off_start_idx"]
+            off_end = steady["off_end_idx"]
+            on_start = steady["on_start_idx"]
+            on_end = steady["on_end_idx"]
 
-            if step_value > 0:
-                # Determine a threshold for steady state (1% of span or 1e-3 mW)
-                span = np.nanmax(p_arr) - np.nanmin(p_arr)
-                steady_thresh = max(abs(step_value) * 0.2, span * 0.01, 1e-3)
-
-                # Find steady region after turn-on by scanning from the end
-                large_changes = np.where(np.abs(diff) > steady_thresh)[0]
-                if len(large_changes) > 0:
-                    last_large = large_changes[-1]
-                    steady_start = max(step_idx + 1, last_large + 1)
-                else:
-                    steady_start = step_idx + 1
-                steady_start = min(steady_start, len(p_arr) - 1)
-
-                # Find steady region before turn-on by scanning from the start
-                if len(large_changes) > 0:
-                    first_large = large_changes[0]
-                    off_end = min(step_idx, first_large + 1)
-                else:
-                    off_end = step_idx
-                off_end = max(1, off_end)
-
-                if off_end >= 2 and (len(p_arr) - steady_start) >= 2:
-                    avg_off = np.mean(p_arr[:off_end])
-                    avg_on = np.mean(p_arr[steady_start:])
-                    delta = avg_on - avg_off
-
-                    ax.hlines(avg_off, t_arr[0], t_arr[off_end - 1], colors='red', linewidth=2, label='_')
-                    ax.hlines(avg_on, t_arr[steady_start], t_arr[-1], colors='green', linewidth=2, label='_')
-                    ax.axvline(t_arr[step_idx], color='gray', linestyle='--', linewidth=1)
-
-        # Fallback to previous behavior if we didn't find a good steady-state split
-        if avg_off is None or avg_on is None:
-            n_avg = min(200, len(p_arr))
-            if n_avg > 0:
-                vals_off = p_arr[:n_avg]
-                vals_on = p_arr[-n_avg:]
-                time_off = t_arr[:n_avg]
-                time_on = t_arr[-n_avg:]
-
-                avg_off = np.mean(vals_off)
-                avg_on = np.mean(vals_on)
-                delta = avg_on - avg_off
-
-                ax.plot(time_off, avg_off * np.ones(n_avg), 'red', linewidth=2, label='_')
-                ax.plot(time_on, avg_on * np.ones(n_avg), 'green', linewidth=2, label='_')
+            if off_start is not None and off_end is not None and off_end > off_start:
+                ax.hlines(avg_off, t_arr[off_start], t_arr[off_end - 1],
+                          colors='red', linewidth=2, label='_')
+            if on_start is not None and on_end is not None and on_end > on_start:
+                ax.hlines(avg_on, t_arr[on_start], t_arr[on_end - 1],
+                          colors='green', linewidth=2, label='_')
+            if steady["step_idx"] is not None:
+                ax.axvline(t_arr[steady["step_idx"]], color='gray',
+                           linestyle='--', linewidth=1)
 
         if delta is not None:
             ax.text(
