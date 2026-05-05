@@ -12,7 +12,7 @@ Usage in ``main.py``::
     MySimPowerMeter("Power meter (sim)", "SIM-PM-000", enable=True, model="PM16-401")
 """
 
-import queue
+import collections
 import random
 import threading
 import time
@@ -52,7 +52,9 @@ class MySimPowerMeter(MyPowerMeter):
 
         # acquisition state
         self.is_running = False
-        self._power_queue: queue.Queue = queue.Queue(maxsize=1)
+        self._sample_buffer: collections.deque = collections.deque(maxlen=1024)
+        self._sample_lock = threading.Lock()
+        self._latest_power: float | None = None
         self._data_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------
@@ -93,24 +95,18 @@ class MySimPowerMeter(MyPowerMeter):
         if self._data_thread is not None:
             self._data_thread.join(timeout=1)
             self._data_thread = None
-        # drain the queue
-        while not self._power_queue.empty():
-            try:
-                self._power_queue.get_nowait()
-            except queue.Empty:
-                break
+        with self._sample_lock:
+            self._sample_buffer.clear()
+            self._latest_power = None
 
     def _acquire(self):
-        """Background thread that pushes simulated readings."""
+        """Background thread that pushes simulated (t, mW) samples."""
         while self.is_running:
             power = self._baseline + random.gauss(0, self._noise)
-            # replace the single-slot queue with the newest reading
-            if not self._power_queue.empty():
-                try:
-                    self._power_queue.get_nowait()
-                except queue.Empty:
-                    pass
-            self._power_queue.put(power)
+            t = time.monotonic()
+            with self._sample_lock:
+                self._sample_buffer.append((t, power))
+                self._latest_power = power
             time.sleep(0.05)  # ~20 Hz
 
     # ------------------------------------------------------------------
@@ -119,10 +115,17 @@ class MySimPowerMeter(MyPowerMeter):
 
     def get_power(self):
         """Return the latest simulated power reading (mW), or ``None``."""
-        try:
-            return self._power_queue.get_nowait()
-        except queue.Empty:
-            return None
+        with self._sample_lock:
+            return self._latest_power
+
+    def get_samples(self):
+        """Drain and return all buffered ``(t_monotonic, mW)`` samples."""
+        with self._sample_lock:
+            if not self._sample_buffer:
+                return []
+            out = list(self._sample_buffer)
+            self._sample_buffer.clear()
+        return out
 
     # ------------------------------------------------------------------
     # Wavelength

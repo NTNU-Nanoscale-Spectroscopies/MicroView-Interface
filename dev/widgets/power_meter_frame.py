@@ -35,9 +35,17 @@ import csv
 import json
 import os
 import re
+import time
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+
+
+# Live-graph redraw cadence in milliseconds.  The acquisition thread keeps
+# sampling at ~20 Hz; this only controls how often the GUI redraws and
+# pulls the sample buffer.  Higher values free up the Tk main thread for
+# other widgets (popups, menus, scrolling).
+_GRAPH_TICK_MS = 200
 
 
 class PowerMeterFrame(CTkFrame):
@@ -118,15 +126,18 @@ class PowerMeterFrame(CTkFrame):
         self.time_data: deque = deque(maxlen=10_000)
         self.power_data: deque = deque(maxlen=10_000)
         self.sample_count = 0
-        self.start_time = None
+        self.start_time = None         # wall-clock timestamp of plot reset
+        self._start_mono = None        # monotonic anchor matching device sample t's
         self._zero_offset = 0.0
         self._update_id = None
         self._line = None  # matplotlib Line2D for efficient updates
+        self._bg = None    # cached axes background for blitting
+        self._needs_full_redraw = True
         self.connected_device = None
         self.popup = None
         self._paused = False  # live display pause state
-        self._paused_at = None     # datetime when pause started
-        self._paused_total = 0.0   # total seconds spent paused
+        self._paused_at_mono = None    # monotonic time when pause started
+        self._paused_total = 0.0       # total seconds spent paused
 
         # recording state
         self._recording = False
@@ -261,6 +272,8 @@ class PowerMeterFrame(CTkFrame):
 
         self.canvas = FigureCanvasTkAgg(self.figure, master=main)
         self.canvas.get_tk_widget().grid(row=1, column=0, sticky="nsew", padx=5, pady=5)
+        # Blitting invalidates the cached background on canvas resize.
+        self.canvas.mpl_connect("resize_event", self._on_canvas_resize)
 
         # --- Info bar (fixed-height cells to prevent jitter) ---
         info = CTkFrame(main, height=80)
@@ -544,8 +557,11 @@ class PowerMeterFrame(CTkFrame):
         self.power_data.clear()
         self.sample_count = 0
         self.start_time = datetime.now()
+        self._start_mono = time.monotonic()
         self._zero_offset = 0.0
         self._line = None  # force new Line2D on fresh axes
+        self._bg = None
+        self._needs_full_redraw = True
 
         # recording state
         self._recording = False
@@ -573,7 +589,7 @@ class PowerMeterFrame(CTkFrame):
         self._populate_range_menu()
 
         self._paused = False
-        self._paused_at = None
+        self._paused_at_mono = None
         self._paused_total = 0.0
         self.play_pause_btn.configure(image=img_pause)
         self.record_btn.configure(text_color="#FF4444")  # not recording
@@ -624,24 +640,39 @@ class PowerMeterFrame(CTkFrame):
         self.power_data.clear()
         self.sample_count = 0
         self.start_time = datetime.now()
+        self._start_mono = time.monotonic()
         self._paused_total = 0.0
         if self._paused:
-            self._paused_at = datetime.now()
+            self._paused_at_mono = time.monotonic()
         else:
-            self._paused_at = None
+            self._paused_at_mono = None
 
-        if self._line is not None:
-            self._line.set_data([], [])
-            self.ax.relim()
-            self.ax.autoscale_view()
-            self.canvas.draw_idle()
-        self._line = None
+        self._reset_plot_artists()
 
         self.power_display.configure(text="--- mW")
         self.samples_display.configure(text="0")
 
         # keep whatever pause state the user set
         self._start_update()
+
+    def _reset_plot_artists(self):
+        """Tear down the current line and force a full redraw next tick."""
+        if self._line is not None:
+            try:
+                self._line.remove()
+            except Exception:
+                pass
+            self._line = None
+        self.ax.relim()
+        self.ax.autoscale_view()
+        self.canvas.draw_idle()
+        self._bg = None
+        self._needs_full_redraw = True
+
+    def _on_canvas_resize(self, event):
+        """Invalidate cached background on canvas resize."""
+        self._bg = None
+        self._needs_full_redraw = True
 
     def _stop_update(self):
         if getattr(self, "_update_id", None):
@@ -652,85 +683,189 @@ class PowerMeterFrame(CTkFrame):
         if not self.connected_device or not self.connected_device.connected:
             # device not (yet) ready – keep the loop alive so it picks
             # up the connection once it is established
-            self._update_id = self.after(200, self._update_graph)
+            self._update_id = self.after(_GRAPH_TICK_MS, self._update_graph)
             return
+
+        # Drain the device's sample buffer regardless of pause state so it
+        # doesn't grow unbounded; while paused we discard the samples.
+        samples = self._drain_device_samples()
 
         if self._paused:
-            self._update_id = self.after(50, self._update_graph)
+            self._update_id = self.after(_GRAPH_TICK_MS, self._update_graph)
             return
 
-        power = None
-        if hasattr(self.connected_device, "get_power"):
-            power = self.connected_device.get_power()
-
-        if power is None:
+        if not samples:
             # occasionally log that we're polling but getting nothing
             if not hasattr(self, '_null_count'):
                 self._null_count = 0
             self._null_count += 1
-            if self._null_count % 40 == 1:  # every ~2 seconds at 50ms
-                print(f"[PowerMeterFrame] get_power() returned None (count={self._null_count}, "
+            if self._null_count % 10 == 1:  # every ~2 s at 200 ms
+                print(f"[PowerMeterFrame] no samples (count={self._null_count}, "
                       f"device.connected={self.connected_device.connected}, "
                       f"is_running={getattr(self.connected_device, 'is_running', '?')})")
+            self._update_id = self.after(_GRAPH_TICK_MS, self._update_graph)
+            return
 
-        if power is not None:
-            adjusted = power - self._zero_offset
-            elapsed = (datetime.now() - self.start_time).total_seconds() - self._paused_total
+        # --- Append all new samples ---
+        elapsed_last = None
+        adjusted_last = None
+        for t_mono, mw in samples:
+            if mw is None or t_mono is None or self._start_mono is None:
+                continue
+            adjusted = mw - self._zero_offset
+            elapsed = t_mono - self._start_mono - self._paused_total
 
             self.time_data.append(elapsed)
             self.power_data.append(adjusted)
             self.sample_count += 1
 
-            # --- recording ---
             if self._recording:
                 self._rec_time_data.append(elapsed)
                 self._rec_power_data.append(adjusted)
-                # check if limit reached
-                if self._check_recording_limit():
-                    self._finish_recording()
 
-            # info bar
-            self.power_display.configure(text=f"{adjusted:.3f} mW")
-            self.samples_display.configure(text=str(self.sample_count))
+            elapsed_last = elapsed
+            adjusted_last = adjusted
 
-            # --- apply live window ---
-            t_list = list(self.time_data)
-            p_list = list(self.power_data)
+        # check recording limit once after batch
+        if self._recording and self._check_recording_limit():
+            self._finish_recording()
 
-            live_mode = self.live_mode_var.get()
-            try:
-                live_val = float(self.live_value_entry.get())
-            except (ValueError, TypeError):
-                live_val = 0
+        if adjusted_last is None:
+            self._update_id = self.after(_GRAPH_TICK_MS, self._update_graph)
+            return
 
-            if live_val > 0:
-                if live_mode == "Time":
-                    # keep only points within the last `live_val` seconds
-                    cutoff = elapsed - live_val
-                    start_idx = 0
-                    for i, t in enumerate(t_list):
-                        if t >= cutoff:
-                            start_idx = i
-                            break
-                    t_list = t_list[start_idx:]
-                    p_list = p_list[start_idx:]
-                else:
-                    # keep the last `live_val` samples
-                    n = int(live_val)
-                    t_list = t_list[-n:]
-                    p_list = p_list[-n:]
+        # info bar (single update per tick instead of per sample)
+        self.power_display.configure(text=f"{adjusted_last:.3f} mW")
+        self.samples_display.configure(text=str(self.sample_count))
 
-            # efficient redraw
-            if self._line is None:
-                self._line, = self.ax.plot(t_list, p_list,
-                                           color="#1E90FF", linewidth=1)
+        # --- apply live window ---
+        t_list = list(self.time_data)
+        p_list = list(self.power_data)
+
+        live_mode = self.live_mode_var.get()
+        try:
+            live_val = float(self.live_value_entry.get())
+        except (ValueError, TypeError):
+            live_val = 0
+
+        if live_val > 0:
+            if live_mode == "Time":
+                cutoff = elapsed_last - live_val
+                start_idx = 0
+                for i, t in enumerate(t_list):
+                    if t >= cutoff:
+                        start_idx = i
+                        break
+                t_list = t_list[start_idx:]
+                p_list = p_list[start_idx:]
             else:
-                self._line.set_data(t_list, p_list)
+                n = int(live_val)
+                t_list = t_list[-n:]
+                p_list = p_list[-n:]
+
+        self._draw_line(t_list, p_list)
+
+        self._update_id = self.after(_GRAPH_TICK_MS, self._update_graph)
+
+    def _drain_device_samples(self):
+        """Return a list of new ``(t_monotonic, mW)`` samples from the device.
+
+        Uses ``get_samples()`` when available (preferred — preserves all
+        samples between GUI ticks).  Falls back to a single ``get_power()``
+        call for devices that don't expose batched samples.
+        """
+        dev = self.connected_device
+        if dev is None:
+            return []
+        if hasattr(dev, "get_samples"):
+            try:
+                return dev.get_samples() or []
+            except Exception as e:
+                debugp("powermeter", f"get_samples error: {e}")
+                return []
+        # legacy fallback
+        if hasattr(dev, "get_power"):
+            try:
+                p = dev.get_power()
+            except Exception:
+                p = None
+            if p is not None:
+                return [(time.monotonic(), p)]
+        return []
+
+    def _draw_line(self, t_list, p_list):
+        """Update the plotted line, blitting where possible.
+
+        Uses matplotlib blitting to avoid a full canvas redraw on every
+        tick.  A full redraw + background re-capture only happens when the
+        new data leaves the current axis limits, when the line is first
+        created, or when the canvas is resized.
+        """
+        if not t_list:
+            return
+
+        # First time after a reset: create the line and force a full redraw.
+        if self._line is None:
+            self._line, = self.ax.plot(
+                t_list, p_list, color="#1E90FF", linewidth=1, animated=True)
+            self._needs_full_redraw = True
+        else:
+            self._line.set_data(t_list, p_list)
+
+        if self._needs_full_redraw or self._bounds_exceeded(t_list, p_list):
+            self._full_redraw()
+        else:
+            self._blit_line()
+
+    def _bounds_exceeded(self, t_list, p_list) -> bool:
+        """Return True if data has moved outside current axis limits."""
+        if not t_list or not p_list:
+            return False
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        if t_list[-1] > xlim[1] or t_list[0] < xlim[0]:
+            return True
+        p_min = min(p_list)
+        p_max = max(p_list)
+        yspan = ylim[1] - ylim[0]
+        if yspan <= 0:
+            return True
+        margin = yspan * 0.05
+        if p_max > ylim[1] - margin or p_min < ylim[0] + margin:
+            return True
+        return False
+
+    def _full_redraw(self):
+        """Recompute axis limits, do a full canvas draw, refresh blit cache."""
+        try:
             self.ax.relim()
             self.ax.autoscale_view()
+            self.canvas.draw()
+            self._bg = self.canvas.copy_from_bbox(self.ax.bbox)
+            if self._line is not None:
+                self.ax.draw_artist(self._line)
+                self.canvas.blit(self.ax.bbox)
+        except Exception as e:
+            debugp("PowerMeterFrame", f"full_redraw error: {e}")
+            self._bg = None
             self.canvas.draw_idle()
+        self._needs_full_redraw = False
 
-        self._update_id = self.after(50, self._update_graph)
+    def _blit_line(self):
+        """Fast path: restore cached background, redraw line only."""
+        if self._bg is None:
+            self._full_redraw()
+            return
+        try:
+            self.canvas.restore_region(self._bg)
+            if self._line is not None:
+                self.ax.draw_artist(self._line)
+            self.canvas.blit(self.ax.bbox)
+        except Exception as e:
+            debugp("PowerMeterFrame", f"blit error: {e}")
+            self._bg = None
+            self._needs_full_redraw = True
+            self.canvas.draw_idle()
 
     def _style_axes(self):
         """Apply consistent styling to the matplotlib axes."""
@@ -790,14 +925,10 @@ class PowerMeterFrame(CTkFrame):
         self.power_data.clear()
         self.sample_count = 0
         self.start_time = datetime.now()
+        self._start_mono = time.monotonic()
         self._paused_total = 0.0
-        self._paused_at = None
-        if self._line is not None:
-            self._line.set_data([], [])
-            self.ax.relim()
-            self.ax.autoscale_view()
-            self.canvas.draw_idle()
-        self._line = None
+        self._paused_at_mono = None
+        self._reset_plot_artists()
 
         # un-pause if currently paused so data flows immediately
         self._paused = False
@@ -812,14 +943,14 @@ class PowerMeterFrame(CTkFrame):
         """Toggle between pausing and resuming the live display."""
         if self._paused:
             # resuming — accumulate pause duration
-            if self._paused_at is not None:
-                self._paused_total += (datetime.now() - self._paused_at).total_seconds()
-                self._paused_at = None
+            if self._paused_at_mono is not None:
+                self._paused_total += time.monotonic() - self._paused_at_mono
+                self._paused_at_mono = None
             self._paused = False
             self.play_pause_btn.configure(image=img_pause)
         else:
             # pausing — record when we paused
-            self._paused_at = datetime.now()
+            self._paused_at_mono = time.monotonic()
             self._paused = True
             self.play_pause_btn.configure(image=img_play)
 
@@ -847,23 +978,19 @@ class PowerMeterFrame(CTkFrame):
         self.power_data.clear()
         self.sample_count = 0
         self.start_time = datetime.now()
+        self._start_mono = time.monotonic()
         self._zero_offset = 0.0
 
         # reset pause-time tracking (keep paused state itself)
         self._paused_total = 0.0
         if self._paused:
             # still paused — anchor to "now" so resumed time starts at 0
-            self._paused_at = datetime.now()
+            self._paused_at_mono = time.monotonic()
         else:
-            self._paused_at = None
+            self._paused_at_mono = None
 
         # reset graph
-        if self._line is not None:
-            self._line.set_data([], [])
-            self.ax.relim()
-            self.ax.autoscale_view()
-            self.canvas.draw_idle()
-        self._line = None
+        self._reset_plot_artists()
 
         # reset info bar
         self.power_display.configure(text="--- mW")
@@ -876,8 +1003,10 @@ class PowerMeterFrame(CTkFrame):
     def _check_recording_limit(self) -> bool:
         """Return True when the recording limit has been reached."""
         if self._rec_mode == "Time":
+            if self._start_mono is None:
+                return False
             elapsed_since_start = (
-                (datetime.now() - self.start_time).total_seconds()
+                time.monotonic() - self._start_mono
                 - self._paused_total
                 - self._rec_start_time
             )
@@ -896,7 +1025,7 @@ class PowerMeterFrame(CTkFrame):
 
         # pause the live display so the user can inspect the recorded trace
         self._paused = True
-        self._paused_at = datetime.now()
+        self._paused_at_mono = time.monotonic()
         self.play_pause_btn.configure(image=img_play)
 
     def _auto_save_recording(self):

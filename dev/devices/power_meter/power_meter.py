@@ -6,7 +6,7 @@ from ctypes import (
     create_string_buffer, c_uint32, c_uint16, c_int16, c_double, byref,
 )
 
-import queue
+import collections
 import threading
 import time
 
@@ -21,8 +21,9 @@ class MyPowerMeter():
     """Thorlabs PM16-401 (or compatible) power meter driver.
 
     Uses the TLPMX wrapper in ``dll_sdk`` for all instrument
-    communication.  Provides a background acquisition thread that pushes
-    readings into a single-slot queue for the GUI to consume.
+    communication.  A background acquisition thread appends timestamped
+    ``(t_monotonic, mW)`` samples into a bounded buffer that the GUI
+    drains in batches via :meth:`get_samples`.
     """
 
     def __init__(self, name, serial, enable=False, model=None):
@@ -39,7 +40,11 @@ class MyPowerMeter():
 
         # acquisition state
         self.is_running = False
-        self._power_queue: queue.Queue = queue.Queue(maxsize=1)
+        # Timestamped (t_monotonic, mW) samples written by the acquisition
+        # thread and drained by the GUI in batches via get_samples().
+        self._sample_buffer: collections.deque = collections.deque(maxlen=1024)
+        self._sample_lock = threading.Lock()
+        self._latest_power: float | None = None
         self._data_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------
@@ -163,28 +168,22 @@ class MyPowerMeter():
         if self._data_thread is not None:
             self._data_thread.join(timeout=2)
             self._data_thread = None
-        # drain the queue
-        while not self._power_queue.empty():
-            try:
-                self._power_queue.get_nowait()
-            except queue.Empty:
-                break
+        with self._sample_lock:
+            self._sample_buffer.clear()
+            self._latest_power = None
 
     def _acquire(self):
-        """Background thread: poll ``measPower`` and push mW into queue."""
+        """Background thread: poll ``measPower`` and append (t, mW) samples."""
         print("[PowerMeter] acquisition thread started")
         while self.is_running and self._tlpm:
             try:
                 power = c_double()
                 self._tlpm.measPower(byref(power), _CH1)
                 mw = power.value * 1000.0  # W → mW
-                # single-slot queue: always keep latest reading
-                if not self._power_queue.empty():
-                    try:
-                        self._power_queue.get_nowait()
-                    except queue.Empty:
-                        pass
-                self._power_queue.put(mw)
+                t = time.monotonic()
+                with self._sample_lock:
+                    self._sample_buffer.append((t, mw))
+                    self._latest_power = mw
             except Exception as e:
                 print(f"[PowerMeter] measPower error: {e}")
                 time.sleep(0.5)  # back off on error
@@ -199,15 +198,13 @@ class MyPowerMeter():
     def get_power(self):
         """Return latest power reading (mW), or ``None``.
 
-        Prefers the background-thread queue.  Falls back to a synchronous
-        ``measPower`` call when the queue is empty (e.g. if the thread
-        failed to start or the SDK behaves differently on certain systems).
+        Returns the latest cached value from the acquisition thread without
+        draining the sample buffer.  Falls back to a synchronous
+        ``measPower`` call when no sample has been produced yet.
         """
-        try:
-            val = self._power_queue.get_nowait()
-            return val
-        except queue.Empty:
-            pass
+        with self._sample_lock:
+            if self._latest_power is not None:
+                return self._latest_power
 
         # Direct fallback: try a blocking read on the calling thread
         if self._tlpm and self.connected:
@@ -219,6 +216,20 @@ class MyPowerMeter():
             except Exception as e:
                 print(f"[PowerMeter] direct measPower fallback error: {e}")
         return None
+
+    def get_samples(self):
+        """Drain and return all buffered ``(t_monotonic, mW)`` samples.
+
+        ``t_monotonic`` is ``time.monotonic()`` captured by the acquisition
+        thread when the reading was taken.  Returned samples are removed
+        from the internal buffer; the next call only sees newer samples.
+        """
+        with self._sample_lock:
+            if not self._sample_buffer:
+                return []
+            out = list(self._sample_buffer)
+            self._sample_buffer.clear()
+        return out
 
     # ------------------------------------------------------------------
     # Wavelength
