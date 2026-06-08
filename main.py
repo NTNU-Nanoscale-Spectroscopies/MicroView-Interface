@@ -15,7 +15,8 @@
 #                                                                             #
 # Developpers :                                                               #
 # - Noah JACOB                                                                #
-# - Oliver MINEAU                                                             #
+# - Oliver MINEAU  
+# - Eirik LU                                                                  #
 #                                                                             #
 ###############################################################################
 
@@ -30,6 +31,7 @@
 # 2. Each component has its own constructor and specific parameters, for example:
 #    - `MyCamera(name, serial, enable)`
 #    - `MySpectrometer(name, serial, enable, dark_correction, integration_time)`
+#    - `MyKymera328i(name, serial, enable, dark_correction, integration_time)`
 #    - `MyShutter(name, serial, enable, model)`
 #    - `MyFilter(name, serial, enable)`
 #    - `MyStage(name, serial, enable)`
@@ -39,6 +41,7 @@
 #    debugging when not in the lab :
 #    - `MySimCamera(name, serial, enable)`
 #    - `MySimSpectrometer(name, serial, enable, dark_correction, integration_time)`
+#    - `MySimKymera328i(name, serial, enable, dark_correction, integration_time)`
 #    - `MySimRotationMount(name, serial, linked_spectrometer_serial, enable)`
 #
 #   Parameter definition :
@@ -77,33 +80,51 @@ from dev.devices.camera.sim_camera import MySimCamera
 from dev.devices.rotation_mounts.rotation_mount import MyRotationMount
 from dev.devices.rotation_mounts.sim_rotation_mount import MySimRotationMount
 from dev.devices.sim_spectrometer import MySimSpectrometer
+from dev.devices.spectrograph.kymera_328i import MyKymera328i
+from dev.devices.spectrograph.sim_kymera_328i import MySimKymera328i
+from dev.devices.filter_wheel.filterwheel import MyFilterWheel
+from dev.devices.filter_wheel.sim_filterwheel import MySimFilterWheel
+from dev.devices.Stage.stage import MyStage
+from dev.devices.Stage.sim_stage import MySimStage
+from dev.devices.Stage.mcm301_stage import MyMCM301Stage
+# power meter
+from dev.devices.power_meter.power_meter import MyPowerMeter
+from dev.devices.power_meter.sim_power_meter import MySimPowerMeter
 
 
 # Define the application version
-version = "V3.0.2"
+version = "V4.0.0"
 
 # Set the size of the application's main window (width, height)
-size = (1200,700)
+size = (2560,1440)
 
 # Set the duration for which notifications will remain visible (in seconds)
 visible_notif_time = 3
 
 # Specify the directory where data backups will be saved
-#backup_directory = r"C:\Users\A068\Documents\Data\Default"
-backup_directory = r"C:\Users\el-ei\Documents\Masterproject\Backup data"
+backup_directory = r"C:\Users\A068\Documents\Data\Default"
+#backup_directory = r"C:\Users\el-ei\Documents\Test data"
 
-# Create an instance of a microscope setup
+# Create an instance of a microscope setup 28939
+# Remove 'Sim' from the class names to connect to real devices 
 gm_microscope = MyMicroscope("Maria Goeppert Mayer",
-    MySimCamera("Camera", "28939", enable=True),
-    MySimSpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
-    MySimSpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
-    MySimRotationMount("White-Light-Plzr", "COM6", "QEP06226", enable=False),
-    MyRotationMount("Laser-Plzr", "COM7", "QEP06226", enable=False),
-    MyShutter("White light - shutter", "26006167", enable=True, model="KST201"),
+    MyKymera328i("Kymera 328i", "KY-05398", enable=True, integration_time=100),
+    #MySimKymera328i("Kymera 328i", "KY-05398", enable=True, integration_time=100),
+    #MySpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
+    #MySpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
+    MyCamera("Camera", "28939", enable=True),
+    MyRotationMount("White-Light-Plzr", "11401261", "KY-05398", enable=False),
+    MyRotationMount("Laser-Plzr", "11401263", "KY-05398", enable=False),
+    MyRotationMount("Half Wave Plate", "11401317", "KY-05398", enable=False),
+    MyShutter("White light - shutter", "26006167", enable=True, model="KST201", stage="FW103M"),
     MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),
     MyShutter("Laser 550nm - shutter", "68800970", enable=False, model="KSC101"),
-    MyFilter("Filter 12", "xxxx"),
-    MyStage("Stage", "xxxx"))
+    MyFilterWheel("Filter wheel", "TP03125974-28787", enable=True),
+    #MySimFilterWheel("Filter wheel (sim)", "SIM-000", enable=True),
+    MyPowerMeter("Power meter", "PM16-401", enable=False, model="PM16-401"),
+    #MySimPowerMeter("Power meter (sim)", "SIM-PM-000", enable=True, model="PM16-401"),
+    MyMCM301Stage("Stage", "TP03349640-693520", slot=1, safety_limit_mm=3.0) #Different from LM stage
+)
 
 
 # Create an instance of a microscope setup
@@ -111,16 +132,44 @@ gm_microscope = MyMicroscope("Maria Goeppert Mayer",
     Avaspec 3648 spectrometer - Connexion is different from Oceanview spectrometers
 """
 lm_microscope = MyMicroscope("Lise Meitner",
-    MySpectrometer("Spectrometer", "xxxx", enable=True),
+    MySpectrometer("Spectrometer-VIS", "QEP06226", enable=True, dark_correction=True, integration_time=100),
+    MySpectrometer("Spectrometer-NIR", "NQ51B1981", integration_time=50),
     MyCamera("Camera", "11499", enable=True),
-    MyShutter("White light - shutter", "26006167", enable=True, model="KST201"),
-    MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),
-    MyFilter("Filter 12", "xxxx"),
-    MyStage("Stage", "xxxx"))
+    MyRotationMount("White-Light-Plzr", "11401818", "QEP06226", enable=False),
+    #MyShutter("White light - shutter", "26006167", enable=True, model="KST201", stage="FW103M"),
+    #MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),
+    #MyFilter("Filter 12", "xxxx"),
+    #MySimStage("Sim Stage", "SIM-000"),
+    MyStage("Stage", "5", stage_type="ZFM2020", channel=2, safety_limit_mm=3.0),
+)
 
+raman_microscope = MyMicroscope("Raman Microscopy",
+    MyKymera328i("Kymera 328i", "KY-05398", enable=True, integration_time=100),
+    #MySimKymera328i("Kymera 328i", "KY328I-XXXX", enable=True, integration_time=100),
+    MyCamera("Camera", "28939", enable=True),
+    MyRotationMount("White-Light-Plzr", "11401261", "KY-05398", enable=False),
+    MyRotationMount("Laser-Plzr", "11401263", "KY-05398", enable=False),
+    MyRotationMount("Half Wave Plate", "11401317", "KY-05398", enable=False),
+    MyShutter("White light - shutter", "26006167", enable=True, model="KST201", stage="FW103M"),
+    MyShutter("Laser 750nm - shutter", "68801094", enable=False, model="KSC101"),
+    MyShutter("Laser 550nm - shutter", "68800970", enable=False, model="KSC101"),
+    MyFilterWheel("Filter wheel", "TP03125974-28787", enable=True),
+    #MySimFilterWheel("Filter wheel (sim)", "SIM-000", enable=True),
+    MyPowerMeter("Power meter", "PM16-401", enable=False, model="PM16-401"),
+    #MySimPowerMeter("Power meter (sim)", "SIM-PM-000", enable=True, model="PM16-401"),
+    #MySimStage("Sim Stage", "SIM-000"),
+    MyMCM301Stage("Stage", "TP03349640-693520", slot=1, safety_limit_mm=3.0) #Different from LM stage
+)
 
 # Create the main application instance
-app = MyApp(version, size, visible_notif_time, backup_directory, gm_microscope, lm_microscope)
+app = MyApp(version, size, visible_notif_time, backup_directory, gm_microscope, lm_microscope, raman_microscope)
+
+# Close the PyInstaller splash screen now that the GUI is ready
+try:
+    import pyi_splash          # only available in frozen (PyInstaller) builds
+    pyi_splash.close()
+except ImportError:
+    pass
 
 # Start the application loop
 app.mainloop()

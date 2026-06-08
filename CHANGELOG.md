@@ -1,4 +1,57 @@
 # Changelog
+## [4.0.0] - 2026-06-08
+### <span style="color:green"> Added </span>
+- Dev : Andor Kymera 328i / Newton CCD spectrograph implemented for GM and Raman microscope configurations.
+- Dev : Kymera live Raman spectrum view and detector image view added with FVB, Image and Multi-track read modes.
+- Dev : Kymera control strip added for center wavelength, grating, side input slit, shutter, focus mirror and side input iris.
+- Dev : Kymera acquisition setup popup added with exposure, cycle time, kinetic series, readout hardware, temperature and cooler controls.
+- Dev : Kymera signal acquisition workflow added with progress feedback, ASCII XY export, optional SIF export and separate-file options.
+- Dev : Z-stack routine added with stage movement, optional autofocus, white-light images, laser spot images and Kymera spectra saved per Z position.
+- Dev : Floating camera window added with synced play, pause, save and exposure controls.
+- Dev : Kymera simulator added for development and UI testing without hardware.
+- Dev : Ocean Optics spectrometer backend fallback added between cseabreeze and pyseabreeze.
+- Dev : PyInstaller build support added for Andor SDK, power meter SDK, libusb, pyusb and seabreeze runtime dependencies.
+
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : KST201 / FW103M white-light shutter homing, velocity and absolute-angle movement stabilized.
+- Dev : Spectrometer reconnection and acquisition-loop recovery improved after stale SeaBreeze handles, USB read framing errors and unsupported dark correction.
+- Dev : Camera connection fallback improved when a Zelux camera is detected but cannot be opened through the ctypes SDK.
+- Dev : Power meter DLL loading now checks bundled and frozen-app paths before falling back to system VISA paths.
+
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Main application version updated to V4.0.0.
+- Dev : Build target renamed to MicroView V.4.0.0.
+- Dev : Main layout reorganized into shared left and right panel containers for device/routine switching, camera pop-out and expanded plots.
+- Dev : GM and Raman microscope configurations now use the Kymera 328i spectrograph serial KY-05398 and link rotation mounts to it.
+
+## [3.5.0] - 2026-03-11
+### <span style="color:green"> Added </span>
+- Dev : GM implemented
+- Dev : Power meter, PM16-401 implemented (GM)
+- Dev : MCM301 stage implemented (GM)
+- Dev : FW212 filter wheel implemented (GM)
+- Dev : Camera device: auto exposure time added (GM)
+- Dev : Rotation mount device for half wave plate (Thorlabs ELL14) added (GM)
+- Dev : Stage control device (Thorlabs MCM3001) added (LM)
+- Dev : GUI changes: splash screen and loading screen added
+- Dev : Raman spectroscopy microscope interface added (GM)
+- Dev : Simple autofocus for camera implemented
+- Dev : Power meter graphing bug resolved
+
+## [3.1.0] - 2026-02-01
+### <span style="color:green"> Added </span>
+- Dev : Separated LM and GM
+- Dev : Thorlabs CCD 8051 Camera implemented in LM
+
+## [3.0.4] - 2026-01-10
+### <span style="color:green"> Added </span>
+- Dev : Polarizer sweep routine added
+
+## [3.0.3] - 2025-11-11
+### <span style="color:green"> Added </span>
+- Dev : Open folder button added
+- Dev : Sweep data duplication fixed
+- Dev : Whithe-light shutter implemented
 
 ## [3.0.2] - 2025-10-13
 ### <span style="color:green"> Added </span>

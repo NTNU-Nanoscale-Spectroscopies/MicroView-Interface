@@ -1,3 +1,79 @@
+v4.0.0
+
+    Added:
+        -Andor Kymera 328i / Newton CCD spectrograph in GM and Raman microscopes
+        -Kymera live Raman spectrum view and detector image view
+        -FVB, Image and Multi-track Kymera read modes
+        -Kymera controls for center wavelength, grating, side input slit, shutter, focus mirror and side input iris
+        -Kymera acquisition setup popup for exposure, cycle time, kinetic series, readout hardware, temperature and cooler setup
+        -Signal acquisition workflow with progress display, ASCII XY export, optional .sif export and separate-file options
+        -Z-stack routine with stage movement, optional autofocus, white-light image, laser spot image and Kymera spectrum saved at each Z position
+        -Floating camera window with synced play/pause/save/exposure controls
+        -Kymera simulator for development and UI testing without hardware
+        -Ocean Optics spectrometer backend fallback between cseabreeze and pyseabreeze
+        -PyInstaller bundling for Andor SDK, power meter SDK, libusb, pyusb and seabreeze runtime dependencies
+    
+    Tested:
+        -Version markers updated to V4.0.0 in main.py and microview.spec
+        -No manual hardware validation notes were present in this file for V4.0.0
+    
+    Removed:
+        -No user-facing removals
+
+    Bugs:
+        -No blocking release bugs listed
+
+v3.5.0
+
+    Added:
+        -GUI changes: splash screen and loading screen
+        -GM Filterwheel (Thorlabs FW212C), with interface
+        -GM Power meter (Thorlabs PM16-401), with interface
+        -GM Raman spectroscopy microscope interface
+        -GM stage control device (Thorlabs MCM301), with interface
+        -GM rotation mount device for half wave plate (Thorlabs ELL14)
+        -GM camera device: auto exposure time
+        -LM stage control device (Thorlabs MCM3001), with interface
+    
+    Tested:
+        -GM laser shutter (Thorlabs KSC101, Thorlabs SH05R/M)
+        -White light shutter (Thorlabs KST201, FW103/M)
+        
+    Removed:
+
+    Bugs:
+
+v3.1.0
+
+    Added:
+        - LM and GM separated
+        - Thorlabs 8051 CCD camera in LM
+    
+    Removed:
+
+    Bugs:
+        -Random movements of polarizer
+
+v3.0.4
+
+    Added:
+       Polarizer sweep routine
+    
+    Removed:
+
+    Bugs:
+        Sweep data duplication
+v3.0.3
+
+    Added:
+        Open folder button
+        White light shutter
+    
+    Removed:
+
+    Bugs:
+        Sweep data duplication
+
 v3.0.2
 
     Added:

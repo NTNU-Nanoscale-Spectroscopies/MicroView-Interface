@@ -48,7 +48,11 @@ def load_image(size, light_filename, dark_filename=None, path="dev/images/"):
         print(f"Error loading image {dark_filename}: {e}")
         dark_image_data = None
         
-    return CTkImage(light_image_data, dark_image_data, size)
+    try:
+        return CTkImage(light_image_data, dark_image_data, size)
+    except ValueError:
+        # no image available, return None so callers can handle gracefully
+        return None
 
 
 img_microscope = load_image((150, 150), 'microscope_black.png', 'microscope_white.png')
@@ -71,3 +75,4 @@ img_split_left = load_image((20, 20), 'split_screen_left_black.png', 'split_scre
 img_split_right = load_image((20, 20), 'split_screen_right_black.png', 'split_screen_right_white.png')
 img_new_experiment = load_image((25, 25), 'new_experiment_black.png', 'new_experiment_white.png')
 img_auto_calibration = load_image((20, 20), 'compass_black.png', 'compass_white.png')
+img_open_folder = load_image((20, 20), 'folder-into_black.png', 'folder_into_white.png')

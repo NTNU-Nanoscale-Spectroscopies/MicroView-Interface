@@ -6,11 +6,20 @@ from dev.user_profile import UserProfile
 from .widgets.microscope_frame import *
 from .widgets.camera_frame import *
 from .widgets.spectrometer_frame import *
+from .widgets.power_meter_frame import PowerMeterFrame
 from .widgets.directory_frame import *
 from .widgets.setup_frame import *
 from .widgets.notification import *
 from .debugHelp import *
+
+# device class for power meter
+from dev.devices.power_meter.power_meter import MyPowerMeter
 import ctypes
+import os
+import sys
+import subprocess
+import time
+from .images.images import img_open_folder
 
 
 class MyApp(CTk):
@@ -43,15 +52,29 @@ class MyApp(CTk):
         self.popup = None
         self.swicth_theme_mode()
         self.set_windows_scale()
-        self.center_window(size[0], size[1])
+        # Use 80% of screen size as the restored-window geometry so it
+        # looks correct on any monitor when the user un-maximises.
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        self.center_window(int(sw * 0.8), int(sh * 0.8))
         set_default_color_theme("dev/themes/MyTheme.json")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        self.menu()       
-        
-        
+        # ensure the safety move is executed even if the window is closed non‑interactively
+        import atexit
+        atexit.register(self._safety_on_exit)
 
+        # Reduce minimize / restore lag: pause expensive update loops
+        # while the window is iconic and resume with a short delay after
+        # restore so CTk finishes its own redraws first.
+        self.bind("<Unmap>", self._on_unmap)
+        self.bind("<Map>", self._on_map)
+        self._map_resume_id = None
 
+        self.menu()
+
+        # Defer maximizing until after the window is fully built and mapped,
+        # otherwise CTk/geometry calls during menu() can reset the state.
+        self.after(0, lambda: self.state("zoomed"))
 
     def menu(self):
         """Displays the application's main menu
@@ -144,57 +167,521 @@ class MyApp(CTk):
             Contains all information about the selected microscope
         """
         self.selected_microscope = microscope
+
+        # ---- Show a loading screen as a separate borderless Toplevel ----
+        # A Toplevel sits above the main window in the OS window stack so
+        # nothing that happens in the main window (widget creation, grid
+        # layout, internal update_idletasks calls) can ever flicker through.
+        import tkinter as tk
+        self.update_idletasks()
+        x = self.winfo_rootx()
+        y = self.winfo_rooty()
+        w = self.winfo_width()
+        h = self.winfo_height()
+
+        self._loading_top = tk.Toplevel()
+        self._loading_top.overrideredirect(True)      # no title bar / borders
+        self._loading_top.attributes("-topmost", True) # stay above everything
+        self._loading_top.geometry(f"{w}x{h}+{x}+{y}")
+
+        bg = "#1a1a2e"
+        self._loading_top.configure(bg=bg)
+        tk.Label(self._loading_top, text="Loading…",
+                 font=("Arial", 28, "bold"), fg="white", bg=bg
+                 ).place(relx=0.5, rely=0.42, anchor="center")
+        tk.Label(self._loading_top, text=f"Initialising {microscope.name}",
+                 font=("Arial", 14), fg="gray", bg=bg
+                 ).place(relx=0.5, rely=0.52, anchor="center")
+
+        self._loading_top.lift()
+        self._loading_top.update()                    # paint the loading screen
+
+        # Now safe to tear down the menu – the Toplevel hides everything
         for widget in self.winfo_children():
-            widget.destroy()
-        
+            if widget is not self._loading_top:
+                widget.destroy()
+
+        # defer the heavy build to the next event-loop cycle
+        self.after(50, lambda: self._build_microscope_view(microscope))
+
+    def _build_microscope_view(self, microscope):
+        """Build the full microscope config panel (called after the loading overlay is visible)."""
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
+        # add extra columns for the top-right buttons so they don't overlap
+        self.grid_columnconfigure(2, weight=0)
+        self.grid_columnconfigure(3, weight=0)
         self.grid_rowconfigure((1,2), weight=2)
         self.grid_rowconfigure((3,4), weight=4)
-
+ 
         self.label = CTkLabel(self, text=f"{microscope.name} - Config panel", font=("Arial", 25))
-        self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=2)
+        # expand title across the extra columns so the right-side buttons have their own space
+        self.label.grid(row=0, column=0, padx=5, pady=5, sticky="ew", columnspan=4)
+
         self.back_button = CTkButton(self, text="Back", width=90, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.stop_devices)
         self.back_button.grid(row=0, column=0, padx=(20, 0), pady=10, sticky="w")
-        self.settings_button = CTkButton(self, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
-        self.settings_button.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="e")
-        
-        self.user_button = CTkButton(self, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
-        self.user_button.grid(row=0, column=1, padx=(0, 65), pady=10, sticky="e")
+
+        # Top-right button container: place it so it does not affect grid column sizing
+        top_right_frame = CTkFrame(self, fg_color="transparent")
+        # place at the top-right corner of the window (anchor northeast)
+        top_right_frame.place(relx=1.0, rely=0.0, anchor="ne", x=-10, y=8)
+
+        self.settings_button = CTkButton(top_right_frame, text="", width=35, height=35, image=img_cogwheel, fg_color="transparent", border_width=2, border_color="#1F6AA5", command=self.settings_popup)
+        self.open_folder_button = CTkButton(top_right_frame, text="", width=35, height=35, image=img_open_folder, fg_color="transparent", border_width=2, border_color="#1F6AA5")
+        self.user_button = CTkButton(top_right_frame, text="DEFAULT", width=35, height=35, fg_color="transparent", border_width=2, border_color="#1F6AA5", font=CTkFont(family="Arial", size=14, weight="bold"), command=self.user_popup)
+        # Pack right-to-left so user button is furthest right
+        self.user_button.pack(side="right", padx=(5,0))
+        self.open_folder_button.pack(side="right", padx=5)
+        self.settings_button.pack(side="right", padx=5)
+
+        # (toggle button moved below into the main frame area)
+        # disable if no power meter devices present for this microscope
+        # we will create the button later after frame creation
 
         self.directory_frame = DirectoryFrame(self, self.backup_directory)
         self.directory_frame.grid(row=1, column=0, padx=(20, 10), pady=10, sticky="nsew")
         
         self.file_system = FileSystem(self, self.backup_directory, self.directory_frame)
+        # wire the open-folder button to the FileSystem implementation
+        self.open_folder_button.configure(command=lambda: self.file_system.open_backup_directory())
+
+        self.camera_popout = None
+        self.camera_popout_frame = None
+        self._camera_popped_out = False
+        self._camera_main_image_size = None
+        self._camera_main_frame_size = None
+        self._spec_pwr_main_frame_size = None
+
+        self.right_panel_container = CTkFrame(self, fg_color="transparent")
+        self.right_panel_container.grid(row=1, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=4)
+        self.right_panel_container.grid_propagate(False)
+        self.right_panel_container.grid_columnconfigure(0, weight=1)
+        self.right_panel_container.grid_rowconfigure(0, weight=2)
+        self.right_panel_container.grid_rowconfigure(1, weight=4)
 
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
-        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
-        self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
-        self.spectrometer_frame.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
-        self.quick_setup_frame = QuickSetupFrame(self, microscope)
-        self.quick_setup_frame.grid(row=2, column=0, padx=(20, 10), pady=(10, 20), sticky="nsew", rowspan=3)
+        self.camera_frame.grid(in_=self.right_panel_container, row=0, column=0, pady=(0, 10), sticky="nsew")
 
+        # we use a dedicated container for the spectrometer / power‑meter area
+        self.spec_pwr_container = CTkFrame(self, fg_color="transparent")
+        self.spec_pwr_container.grid(in_=self.right_panel_container, row=1, column=0, pady=(10, 0), sticky="nsew")
+        self.spec_pwr_container.grid_propagate(False)
+        # layout: row0 for toggle button, row1 for frames
+        self.spec_pwr_container.grid_rowconfigure(0, weight=0)
+        self.spec_pwr_container.grid_rowconfigure(1, weight=1)
+        self.spec_pwr_container.grid_columnconfigure(0, weight=1)
+        self.spec_pwr_container.grid_columnconfigure(1, weight=0)
+
+        # Toggle button to switch between spectrometer and power-meter views.
+        # Created when both device types are declared; starts hidden and is
+        # shown/hidden dynamically by update_spec_pwr_toggle_state() whenever
+        # device connectivity changes.
+        if self.find_devices_by_type(microscope, MyPowerMeter) and self.find_devices_by_type(microscope, MySpectrometer):
+            self.spec_power_toggle_button = CTkButton(
+                self.spec_pwr_container,
+                text="Show Pwr",
+                width=60,
+                height=35,
+                fg_color="transparent",
+                border_width=2,
+                border_color="#1F6AA5",
+                command=self.toggle_spectrometer_power,
+            )
+            # place it in the grid but keep it hidden until both sides connect
+            self.spec_power_toggle_button.grid(row=0, column=1, sticky="ne", padx=5, pady=5)
+            self.spec_power_toggle_button.grid_remove()
+        else:
+            self.spec_power_toggle_button = None
+
+        # now create the two stackable frames; use self as master so they
+        # have access to attributes like file_system.  Both live in the
+        # same grid cell — we use tkraise() to swap the visible one,
+        # avoiding the expensive grid_forget/grid cycle.
+        self.spectrometer_frame = SpectrometerFrame(self, self.find_devices_by_type(microscope, MySpectrometer))
+        self.spectrometer_frame.grid(in_=self.spec_pwr_container, row=1, column=0, columnspan=2, sticky="nsew")
+
+        self.power_meter_frame = PowerMeterFrame(self, self.find_devices_by_type(microscope, MyPowerMeter))
+        self.power_meter_frame.grid(in_=self.spec_pwr_container, row=1, column=0, columnspan=2, sticky="nsew")
+
+        # If spectrometers are present, default to spectrometer view;
+        # otherwise show power meter (useful for setups like Raman that have
+        # no spectrometer but do have a power meter).
+        has_spectrometers = bool(self.find_devices_by_type(microscope, MySpectrometer))
+        has_power_meter   = bool(self.find_devices_by_type(microscope, MyPowerMeter))
+        if has_spectrometers:
+            self.spectrometer_frame.tkraise()
+            self._spec_visible = True
+        elif has_power_meter:
+            self.power_meter_frame.tkraise()
+            self._spec_visible = False
+            if self.spec_power_toggle_button:
+                self.spec_power_toggle_button.configure(text="Show Spec")
+        else:
+            self.spectrometer_frame.tkraise()
+            self._spec_visible = True
+
+        # Left-side panels share one container so the toggle bar and active
+        # menu move together and can use the empty space below the file fields.
+        self.left_panel_container = CTkFrame(self, fg_color="transparent")
+        self.left_panel_container.grid(row=2, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=3)
+        self.left_panel_container.grid_columnconfigure(0, weight=1)
+        self.left_panel_container.grid_rowconfigure(0, weight=0)
+        self.left_panel_container.grid_rowconfigure(1, weight=1)
+
+        # instantiate both left-side panels (devices and routines) but do not grid both simultaneously
+        self.quick_setup_frame = QuickSetupFrame(self, microscope)
+        self.routines_frame = RoutinesFrame(self, microscope)  # new secondary menu
+
+        # small toggle bar placed above the left panel area
+        self.left_toggle_frame = CTkFrame(self.left_panel_container, fg_color="transparent")
+        self.left_toggle_frame.grid(row=0, column=0, pady=(0, 0), sticky="nw")
+ 
+        self.devices_toggle_btn = CTkButton(self.left_toggle_frame, text="Devices", width=100, fg_color="transparent",
+                                            border_width=2, border_color="#1F6AA5",
+                                            command=lambda: self.show_left_panel("devices"))
+        self.routines_toggle_btn = CTkButton(self.left_toggle_frame, text="Routines", width=100, fg_color="transparent",
+                                             border_width=2, border_color="#1F6AA5",
+                                             command=lambda: self.show_left_panel("routines"))
+        # ensure buttons are anchored to the left inside the toggle frame
+        self.devices_toggle_btn.pack(side="left", padx=(0, 8), anchor="w")
+        self.routines_toggle_btn.pack(side="left", anchor="w")
+
+        # show devices panel by default
+        self.show_left_panel("devices")
+ 
         for rotation_mount in self.find_devices_by_type(microscope, MyRotationMount):
                         
             spectrometer_serial = rotation_mount.associated_spectrometer
             if not spectrometer_serial:
                 continue
-            
+        
             spectrometer = self.find_device_by_serial(microscope, spectrometer_serial)
             if not spectrometer:
                 continue
-            
+        
             rotation_mount.setup_auto_calibration(spectrometer, self.spectrometer_frame, self.spectrometer_frame.set_unavailable, self.spectrometer_frame.set_available)
-            
-            #Can't find why this line creates a deiconify bug :\
-            #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
+        
+        #Can't find why this line creates a deiconify bug :\
+        #self.notification(f"Associated {rotation_mount.name} with {spectrometer.name}", color="#1a8300")
 
         
         self.is_menu = False
         
         debugp("connecting", "Check connected devices")
         self.quick_setup_frame.check_connected_devices()
+        # ensure spectrometer/power toggle reflects current connection state
+        self.update_spec_pwr_toggle_state()
 
+        # ---- Tear-down of loading screen ----
+        # Everything is built.  Force the main window to complete its full
+        # render cycle while the Toplevel still covers it, then destroy
+        # the Toplevel to reveal the fully-rendered microscope GUI.
+        self.update()                       # render all widgets behind the Toplevel
+        try:
+            self._loading_top.destroy()
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # Minimize / restore handlers
+    # ------------------------------------------------------------------
+
+    def _on_unmap(self, event):
+        """Pause heavy update loops when the window is minimized."""
+        if event.widget is not self:
+            return
+        if hasattr(self, "power_meter_frame"):
+            self.power_meter_frame._stop_update()
+
+    def _on_map(self, event):
+        """Resume update loops after the window is restored.
+
+        A short delay lets customtkinter finish its own canvas redraws
+        before we start pushing matplotlib frames again.
+        """
+        if event.widget is not self:
+            return
+        if self._map_resume_id:
+            self.after_cancel(self._map_resume_id)
+        self._map_resume_id = self.after(200, self._resume_after_map)
+
+    def _resume_after_map(self):
+        self._map_resume_id = None
+        if not hasattr(self, "power_meter_frame"):
+            return
+        # only resume if power meter view is active and device connected
+        if not getattr(self, "_spec_visible", True):
+            if self.power_meter_frame.connected_device:
+                self.power_meter_frame._reset_and_start()
+
+    def toggle_camera_popout(self):
+        """Move the camera view between the main layout and a floating window."""
+        if getattr(self, "_camera_popped_out", False):
+            self.restore_camera_frame()
+        else:
+            self.popout_camera_frame()
+
+    def popout_camera_frame(self):
+        """Show the camera in a separate window and let the spectrum area expand."""
+        if not hasattr(self, "camera_frame") or not self.camera_frame:
+            return
+
+        if getattr(self, "camera_popout", None):
+            try:
+                if self.camera_popout.winfo_exists():
+                    self.camera_popout.lift()
+                    try:
+                        self.camera_popout.attributes("-topmost", True)
+                        self.after(250, self._release_camera_popout_topmost)
+                    except Exception:
+                        pass
+                    self.camera_popout.focus_force()
+                    return
+            except Exception:
+                self.camera_popout = None
+                self.camera_popout_frame = None
+
+        self._remember_camera_main_layout()
+
+        try:
+            self.camera_frame.grid_forget()
+        except Exception:
+            pass
+
+        try:
+            self.spec_pwr_container.grid_forget()
+            self.spec_pwr_container.grid(in_=self.right_panel_container, row=0, column=0, rowspan=2, sticky="nsew")
+        except Exception:
+            pass
+
+        width = max(900, self.camera_frame.winfo_width())
+        height = max(650, self.camera_frame.winfo_height())
+        x = self.winfo_x() + 80
+        y = self.winfo_y() + 80
+
+        self.camera_popout = CTkToplevel(self)
+        self.camera_popout.title("Camera view")
+        self.camera_popout.geometry(f"{width}x{height}+{x}+{y}")
+        self.camera_popout.minsize(520, 360)
+        self.camera_popout.resizable(True, True)
+        self.camera_popout.grid_rowconfigure(0, weight=1)
+        self.camera_popout.grid_columnconfigure(0, weight=1)
+        self.camera_popout.protocol("WM_DELETE_WINDOW", self.restore_camera_frame)
+        try:
+            self.camera_popout.attributes("-toolwindow", False)
+        except Exception:
+            pass
+        try:
+            self.camera_popout.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        self.camera_popout_frame = FloatingCameraFrame(self.camera_popout, self.camera_frame, self.restore_camera_frame)
+        self.camera_popout_frame.grid(row=0, column=0, sticky="nsew")
+
+        self._camera_popped_out = True
+        self._bring_camera_popout_to_front()
+        self._refresh_expanded_view(resize_camera=False)
+
+    def _remember_camera_main_layout(self):
+        """Capture the normal right-column split before camera pop-out."""
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+        try:
+            if self.camera_frame.image_width and self.camera_frame.image_height:
+                self._camera_main_image_size = (self.camera_frame.image_width, self.camera_frame.image_height)
+        except Exception:
+            self._camera_main_image_size = None
+        try:
+            self._camera_main_frame_size = (self.camera_frame.winfo_width(), self.camera_frame.winfo_height())
+        except Exception:
+            self._camera_main_frame_size = None
+        try:
+            self._spec_pwr_main_frame_size = (self.spec_pwr_container.winfo_width(), self.spec_pwr_container.winfo_height())
+        except Exception:
+            self._spec_pwr_main_frame_size = None
+
+    def _bring_camera_popout_to_front(self):
+        """Make the floating camera window visible above the main GUI."""
+        popout = getattr(self, "camera_popout", None)
+        if not popout:
+            return
+        try:
+            popout.lift()
+            popout.focus_force()
+        except Exception:
+            pass
+        self.after(250, self._release_camera_popout_topmost)
+
+    def _release_camera_popout_topmost(self):
+        """Release global topmost while keeping the pop-out owned by the app."""
+        popout = getattr(self, "camera_popout", None)
+        if not popout:
+            return
+        try:
+            if popout.winfo_exists():
+                popout.attributes("-topmost", False)
+                popout.lift()
+        except Exception:
+            pass
+
+    def restore_camera_frame(self):
+        """Return the camera to the main layout and restore the initial split."""
+        popout_frame = getattr(self, "camera_popout_frame", None)
+        if popout_frame:
+            try:
+                popout_frame.on_closing()
+            except Exception:
+                pass
+        self.camera_popout_frame = None
+
+        popout = getattr(self, "camera_popout", None)
+        self.camera_popout = None
+        if popout:
+            try:
+                if popout.winfo_exists():
+                    popout.protocol("WM_DELETE_WINDOW", lambda: None)
+                    popout.destroy()
+            except Exception:
+                pass
+
+        if hasattr(self, "camera_frame") and self.camera_frame:
+            try:
+                self.camera_frame.grid_forget()
+                self.camera_frame.grid(in_=self.right_panel_container, row=0, column=0, pady=(0, 10), sticky="nsew")
+            except Exception:
+                pass
+
+        if hasattr(self, "spec_pwr_container") and self.spec_pwr_container:
+            try:
+                self.spec_pwr_container.grid_forget()
+                self.spec_pwr_container.grid(in_=self.right_panel_container, row=1, column=0, pady=(10, 0), sticky="nsew")
+            except Exception:
+                pass
+
+        self._camera_popped_out = False
+        self._restore_camera_main_layout()
+        self._restore_camera_main_image_size()
+        self._refresh_expanded_view(resize_camera=False)
+        self.after(50, self._restore_camera_main_layout)
+
+    def _restore_camera_main_layout(self):
+        """Restore the right-column split captured before pop-out."""
+        camera_height = self._camera_main_frame_size[1] if self._camera_main_frame_size else 0
+        spec_height = self._spec_pwr_main_frame_size[1] if self._spec_pwr_main_frame_size else 0
+        try:
+            self.grid_rowconfigure(1, weight=2, minsize=0)
+            self.grid_rowconfigure(2, weight=2, minsize=0)
+            self.grid_rowconfigure(3, weight=4, minsize=0)
+            self.grid_rowconfigure(4, weight=4, minsize=0)
+            self.right_panel_container.grid_rowconfigure(0, weight=2, minsize=camera_height)
+            self.right_panel_container.grid_rowconfigure(1, weight=4, minsize=spec_height)
+        except Exception:
+            pass
+        try:
+            if self._camera_main_frame_size:
+                self.camera_frame.configure(
+                    width=self._camera_main_frame_size[0],
+                    height=self._camera_main_frame_size[1],
+                )
+        except Exception:
+            pass
+        try:
+            if self._spec_pwr_main_frame_size:
+                self.spec_pwr_container.configure(
+                    width=self._spec_pwr_main_frame_size[0],
+                    height=self._spec_pwr_main_frame_size[1],
+                )
+        except Exception:
+            pass
+        self._restore_camera_main_image_size()
+
+    def _restore_camera_main_image_size(self):
+        """Restore the in-layout camera image dimensions saved before pop-out."""
+        size = getattr(self, "_camera_main_image_size", None)
+        if not size or not hasattr(self, "camera_frame"):
+            return
+        try:
+            width, height = size
+            self.camera_frame.set_image_size(width, height)
+        except Exception:
+            pass
+
+    def _refresh_expanded_view(self, resize_camera=True):
+        """Ask camera and plot widgets to recompute sizes after a layout change."""
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+        if resize_camera:
+            try:
+                self.camera_frame.resize_image()
+            except Exception:
+                pass
+        try:
+            if hasattr(self.spectrometer_frame, "canvas"):
+                self.spectrometer_frame.canvas.draw_idle()
+        except Exception:
+            pass
+        try:
+            if hasattr(self.power_meter_frame, "_needs_full_redraw"):
+                self.power_meter_frame._needs_full_redraw = True
+        except Exception:
+            pass
+
+    def toggle_spectrometer_power(self):
+        """Switch between spectrometer and power meter display frames.
+
+        The two frames occupy the same grid location inside a shared container;
+        this method hides the currently visible one and shows the other.  If the
+        corresponding device type is not present the button does nothing.  The
+        button text is updated to indicate which view will be shown next ("Spec"
+        means press to view spectrometer, etc.).
+        """
+        # if there is no power meter, do nothing
+        if not hasattr(self, 'power_meter_frame') or self.power_meter_frame is None:
+            return
+        if self._spec_visible:
+            # bring power meter to front (zero-cost layer swap)
+            self.power_meter_frame.tkraise()
+            self._spec_visible = False
+            # reset & resume live graph when power meter becomes visible
+            if self.power_meter_frame.connected_device:
+                self.power_meter_frame._reset_and_start()
+            self.spec_power_toggle_button.configure(text="Show Spec")
+        else:
+            # pause live graph when power meter goes behind
+            self.power_meter_frame._stop_update()
+            self.spectrometer_frame.tkraise()
+            self._spec_visible = True
+            self.spec_power_toggle_button.configure(text="Show Pwr")
+
+    def update_spec_pwr_toggle_state(self):
+        """Show or hide the spec/pwr toggle button.
+
+        The button is only visible when **both** at least one spectrometer
+        **and** at least one power meter are currently connected.  Called by
+        :class:`QuickSetupFrame` whenever device connectivity changes.
+        """
+        # guard against early calls or microscopes without both device types
+        if not hasattr(self, 'spec_power_toggle_button') or not self.spec_power_toggle_button:
+            return
+
+        specs  = self.find_devices_by_type(self.selected_microscope, MySpectrometer) if self.selected_microscope else None
+        meters = self.find_devices_by_type(self.selected_microscope, MyPowerMeter)   if self.selected_microscope else None
+
+        spec_connected  = any(s.connected for s in specs)  if specs  else False
+        meter_connected = any(m.connected for m in meters) if meters else False
+
+        debugp("powermeter", f"update_spec_pwr_toggle_state: spec_connected={spec_connected}, meter_connected={meter_connected}")
+
+        if spec_connected and meter_connected:
+            self.spec_power_toggle_button.grid()          # make visible
+            self.spec_power_toggle_button.configure(state="normal")
+        else:
+            self.spec_power_toggle_button.grid_remove()   # hide completely
 
     def settings_popup(self):
         """Displays the setings popup.
@@ -205,8 +692,8 @@ class MyApp(CTk):
             self.popup.title("Settings")
             self.popup.minsize(405, 200)
             self.center_popup(600, 250)
-            self.popup.grid_rowconfigure((1,2), weight=1)
-            self.popup.grid_columnconfigure((0,1), weight=1)
+            self.popup.grid_rowconfigure(1, weight=1)
+            self.popup.grid_columnconfigure(0, weight=1)
             self.popup.protocol("WM_DELETE_WINDOW", self.close_popup)
             self.popup.attributes("-topmost", True)
             self.after(50, lambda: self.popup.attributes("-topmost", False))
@@ -373,16 +860,75 @@ class MyApp(CTk):
         return None
     
     def stop_devices(self):
-        """Stops and disconnects all devices currently in use, 
+        """Stops and disconnects all devices currently in use,
         then returns to the main menu
         """
         if not self.selected_microscope: return
+        self.restore_camera_frame()
         for device in self.selected_microscope.devices:
             device.disconnect()
         self.notif_list = []
         self.menu()
 
+    def show_left_panel(self, name):
+        """Show either 'devices' (QuickSetupFrame) or 'routines' (RoutinesFrame) in the left area.
+        Both frames occupy the exact same grid area so they don't interfere with other widgets.
+        """
+        # hide both
+        try:
+            self.quick_setup_frame.grid_forget()
+        except Exception:
+            pass
+        try:
+            self.routines_frame.grid_forget()
+        except Exception:
+            pass
 
+        # grid the requested panel into the same location
+        if name == "routines":
+            self.routines_frame.grid(in_=self.left_panel_container, row=1, column=0, sticky="nsew")
+        else:
+            self.quick_setup_frame.grid(in_=self.left_panel_container, row=1, column=0, sticky="nsew")
+
+        # Visuals: keep border present for both, only swap fill (fg_color).
+        # Choose an appropriate unselected fill depending on current theme.
+        selected_fill = "#1F6AA5"         # blue when selected
+        selected_hover = "#145b84"
+        border_col = "#1F6AA5"
+        # pick a light/dark neutral fill for unselected based on current appearance
+        if getattr(self, "apparence_color_theme", "light") == "dark":
+            unselected_fill = "#2F3336"  # dark gray background for unselected in dark mode
+            unselected_hover = "#3b3f41"
+            unselected_text = "#DCE4EE"
+        else:
+            unselected_fill = "#ECEFF1"  # light gray for unselected in light mode
+            unselected_hover = "#e0e4e8"
+            unselected_text = "gray10"
+
+        # Configure both buttons explicitly (border always visible).
+        common_unselected_cfg = dict(fg_color=unselected_fill, hover_color=unselected_hover,
+                                     text_color=unselected_text, border_width=2, border_color=border_col)
+        common_selected_cfg = dict(fg_color=selected_fill, hover_color=selected_hover,
+                                   text_color="white", border_width=2, border_color=border_col)
+
+        if name == "routines":
+            self.routines_toggle_btn.configure(**common_selected_cfg)
+            self.devices_toggle_btn.configure(**common_unselected_cfg)
+        else:
+            self.devices_toggle_btn.configure(**common_selected_cfg)
+            self.routines_toggle_btn.configure(**common_unselected_cfg)
+
+        # Force immediate repaint: generate a Leave event and update; schedule a tiny delayed refresh
+        try:
+            for btn in (self.devices_toggle_btn, self.routines_toggle_btn):
+                btn.event_generate("<Leave>")
+            self.update_idletasks()
+            # one more short delayed update to ensure CTk internal hover state is cleared
+            self.after(10, lambda: (self.devices_toggle_btn.event_generate("<Leave>"),
+                                    self.routines_toggle_btn.event_generate("<Leave>"),
+                                    self.update_idletasks()))
+        except Exception:
+            pass
     def notification(self, head_message=None, message=None, color=None, path=""):
         """Creates notifications attached to the main window. 
         Also supports visual stacking of notifications
@@ -425,12 +971,38 @@ class MyApp(CTk):
         self.after(300, self.close)
 
 
+    def _safety_on_exit(self):
+        """Internal helper invoked during shutdown to park filter wheels.
+
+        This is used both from :meth:`close` and an :mod:`atexit` callback,
+        so it must be safe to call multiple times (it just quietly ignores
+        disconnected wheels).
+        """
+        try:
+            if self.selected_microscope:
+                for dev in self.selected_microscope.devices:
+                    if dev.__class__.__name__ == 'MyFilterWheel' and getattr(dev, 'connected', False):
+                        try:
+                            dev.set_position(12)
+                        except Exception as e:
+                            print(f"[shutdown] failed to move filter wheel to safety position: {e}")
+                        else:
+                            time.sleep(0.2)
+        except Exception as e:
+            print("[shutdown] exception during safety move", e)
+
     def close(self):
         """This method allows threads to be stopped cleanly before devices are disconnected
         """
+        # run the parking routine first (also called by atexit)
+        self._safety_on_exit()
+
         if not self.is_menu:
+            self.restore_camera_frame()
             self.spectrometer_frame.on_closing()
             self.camera_frame.on_closing()
+            if hasattr(self, 'power_meter_frame') and self.power_meter_frame:
+                self.power_meter_frame.on_closing()
         self.stop_devices()
         self.destroy()
 

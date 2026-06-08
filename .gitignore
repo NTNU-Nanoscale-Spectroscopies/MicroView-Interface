@@ -4,4 +4,11 @@ venv/
 .DS_Store
 build
 testRotator.py
-file_name.py
+file_name.pyu
+usb.dmp
+
+# Intermediate / test build artifacts (only the versioned release .exe is tracked)
+dist/*(test*.exe
+
+# Editor / AI assistant config (not for distribution)
+.github/
