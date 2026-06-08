@@ -98,7 +98,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='MicroView V.4.0.0 (Debug)',
+    name='MicroView V.4.0.0',
     debug=True,
     bootloader_ignore_signals=False,
     strip=False,
