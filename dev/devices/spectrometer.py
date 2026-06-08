@@ -6,45 +6,103 @@ import time
 from dev.debugHelp import debugp
 
 
+def _list_real_serials():
+    """Return the serials the current backend can actually read right now.
+
+    A device that enumerates but whose serial comes back empty or as ``'?'``
+    is *seen* but not *reachable* -- typically because its USB driver binding
+    no longer matches the active backend, or another process holds it open.
+    cseabreeze does exactly this on the LM box (``seabreeze sees ['?']``),
+    yet ``Spectrometer.from_serial_number()`` then fails with "No device
+    attached". Such phantom entries must not count as a usable device, or the
+    selector wrongly commits to a backend that can't open anything.
+    """
+    try:
+        import seabreeze.spectrometers as _probe
+        serials = []
+        for dev in _probe.list_devices():
+            serial = getattr(dev, "serial_number", None)
+            if serial and str(serial).strip() not in ("", "?"):
+                serials.append(str(serial))
+        return serials
+    except Exception:
+        return []
+
+
+def _teardown_seabreeze_probe():
+    """Release any cached backend handles so the next access rebuilds clean.
+
+    Switching backends after ``seabreeze.spectrometers`` has been imported
+    only takes effect once the module's cached singletons (the API/library
+    handle and the ``SeaBreezeDevice`` class) are dropped. We also shut the
+    cached API down first so a ``'?'`` device cseabreeze is half-holding is
+    released before pyseabreeze tries to enumerate it.
+    """
+    try:
+        import seabreeze.spectrometers as _probe
+    except Exception:
+        return
+    cached_api = getattr(_probe.list_devices, "_api", None)
+    if cached_api is not None:
+        for method_name in ("shutdown", "close"):
+            method = getattr(cached_api, method_name, None)
+            if callable(method):
+                try:
+                    method()
+                except Exception:
+                    pass
+                break
+    for cached in ("_lib", "SeaBreezeDevice"):
+        _probe.__dict__.pop(cached, None)
+    try:
+        del _probe.list_devices._api
+    except AttributeError:
+        pass
+
+
 def _select_seabreeze_backend():
-    """Choose a seabreeze backend that can actually see the spectrometer.
+    """Choose a seabreeze backend that can actually reach the spectrometer.
 
     On machines where Ocean Optics' OmniDriver has been installed, Windows
     binds the QE Pro to the libusb-win32 (``libusb0``) driver and the default
     ``cseabreeze`` backend (a compiled libseabreeze) finds it. On machines
     where Windows binds the device to its inbox ``WINUSB`` driver instead --
     e.g. a fresh laptop that's never had Ocean Optics software installed --
-    libseabreeze sees nothing, but ``pyseabreeze`` (which talks via
-    ``pyusb`` + ``libusb-1.0``) can reach a WINUSB-bound device.
+    libseabreeze sees nothing (or sees it with an unreadable ``'?'`` serial),
+    but ``pyseabreeze`` (which talks via ``pyusb`` + ``libusb-1.0``) can reach
+    a WINUSB-bound device.
 
-    So: try cseabreeze first to preserve the lab box's working setup, then
-    fall back to pyseabreeze if cseabreeze enumerates zero devices.
+    Try cseabreeze first to preserve the lab box's historical setup, but only
+    keep it if it can read a *real* serial. If all it sees is a ``'?'`` phantom
+    (the LM regression), tear it down and fall back to pyseabreeze. Whichever
+    backend we land on, log what each one actually saw so a driver-level
+    problem is obvious from the console/log.
     """
     try:
         seabreeze.use("cseabreeze")
-        import seabreeze.spectrometers as _probe
-        if _probe.list_devices():
+        serials = _list_real_serials()
+        print(f"[seabreeze] cseabreeze sees: {serials or '[] (none / unreadable)'}")
+        if serials:
             return "cseabreeze"
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[seabreeze] cseabreeze probe failed: {e}")
 
-    # cseabreeze either failed or saw nothing. Wipe its cached singletons
-    # from the spectrometers module so the next access rebuilds against
-    # pyseabreeze, then switch backends.
+    # cseabreeze failed or only saw unreachable phantoms. Drop its cached
+    # handles and try pyseabreeze, which reaches WINUSB-bound devices.
     try:
-        import seabreeze.spectrometers as _probe
-        for cached in ("_lib", "SeaBreezeDevice"):
-            _probe.__dict__.pop(cached, None)
-        try:
-            del _probe.list_devices._api
-        except AttributeError:
-            pass
+        _teardown_seabreeze_probe()
         seabreeze.use("pyseabreeze")
+        serials = _list_real_serials()
+        print(f"[seabreeze] pyseabreeze sees: {serials or '[] (none / unreadable)'}")
         return "pyseabreeze"
     except Exception as e:
-        # pyseabreeze not importable (pyusb missing, etc.) -- stay on
+        # pyseabreeze not importable (pyusb missing, etc.) -- fall back to
         # cseabreeze and let connect() surface a proper error.
         print(f"[seabreeze] pyseabreeze unavailable, keeping cseabreeze: {e}")
+        try:
+            seabreeze.use("cseabreeze")
+        except Exception:
+            pass
         return "cseabreeze"
 
 
@@ -53,6 +111,17 @@ print(f"[seabreeze] Using backend: {_SEABREEZE_BACKEND}")
 
 import seabreeze.spectrometers as _sb_spec
 from seabreeze.spectrometers import Spectrometer, list_devices
+
+
+# Serials of spectrometers currently holding an open handle on the shared
+# backend. cseabreeze exposes ONE process-wide SeaBreezeAPI, so tearing it
+# down (see _refresh_seabreeze_api) invalidates every open device's handle at
+# once -- and the native library then hard-crashes the whole process
+# (exit code 0xC0000409) on the next call into a dead handle. That is exactly
+# the LM failure: the VIS QE Pro connected fine, then the absent NIR's
+# open-retry refreshed the API and killed the live VIS handle. We track open
+# devices here so the refresh can refuse to run while anything else is open.
+_OPEN_SERIALS = set()
 
 
 def _refresh_seabreeze_api():
@@ -65,6 +134,13 @@ def _refresh_seabreeze_api():
     returns the same empty list. Recreating the API forces a fresh USB
     enumeration on the next call.
     """
+    # Refusing to tear down the shared API while another spectrometer holds an
+    # open handle: doing so would invalidate that handle and crash the process
+    # natively on its next call. A device that genuinely needs a fresh
+    # enumeration will get one once nothing else is open.
+    if _OPEN_SERIALS:
+        debugp("spec", f"Skipping seabreeze API refresh; still open: {sorted(_OPEN_SERIALS)}")
+        return
     cached_api = getattr(_sb_spec.list_devices, "_api", None)
     if cached_api is None:
         return
@@ -141,6 +217,7 @@ class MySpectrometer():
                 pass
 
             self.connected = True
+            _OPEN_SERIALS.add(str(self.serial))
             print(f"Connected to {self.name} ({self.serial})")
         except Exception as e:
             print(f"Failed to open {self.name} ({self.serial}): {e}")
@@ -323,6 +400,7 @@ class MySpectrometer():
             time.sleep(0.2)
             self.spectrometer.close() #Maybe we shouldn't use .close() ?
             self.connected = False
+            _OPEN_SERIALS.discard(str(self.serial))
             print(f"{self.name} disconnected.")
 
 
@@ -335,8 +413,22 @@ class MySpectrometer():
             The required spectrometer integration time
         """
         if self.connected:
-            self.spectrometer.integration_time_micros(time_microseconds)
-            self.integration_time = time_microseconds
+            try:
+                self.spectrometer.integration_time_micros(time_microseconds)
+                self.integration_time = time_microseconds
+            except Exception as e:
+                # Called from a Tk callback (connect / UI change). If the
+                # handle has gone dead, an uncaught error here propagates into
+                # tkinter and the native library can abort the whole process.
+                # Mark the device lost instead so the GUI degrades gracefully.
+                print(f"Failed to set integration time on {self.name}: {e}")
+                self._mark_lost()
+
+    def _mark_lost(self):
+        """Flag the device as no longer reachable without raising."""
+        self.connected = False
+        self.is_running = False
+        _OPEN_SERIALS.discard(str(self.serial))
 
     def get_temperature(self):
         # pyseabreeze's QE Pro device class doesn't expose the thermo_electric
@@ -344,17 +436,20 @@ class MySpectrometer():
         # and every call would raise AttributeError. Short-circuit silently
         # here so the once-per-second update_temperature() poll doesn't spam
         # the console -- the temperature widget will just show "no reading".
-        tec = getattr(getattr(self.spectrometer, "f", None), "thermo_electric", None)
-        if tec is None:
-            return None
+        # The whole body is guarded because accessing ``.f`` on a dead handle
+        # raises a SeaBreezeError (not AttributeError), which getattr() would
+        # not absorb -- and that error reaching the Tk poll crashed the app.
         try:
+            tec = getattr(getattr(self.spectrometer, "f", None), "thermo_electric", None)
+            if tec is None:
+                return None
             tec_status = tec.enable_tec(True)
             tec_temp = tec.read_temperature_degrees_celsius()
             debugp("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
             return tec_temp
         except Exception as e:
             debugp("TEC", f"Tec not working : {e}")
-        return
+        return None
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"

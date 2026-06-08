@@ -1438,14 +1438,20 @@ class SpectrometerFrame(CTkFrame):
 
             if x_sorted.size >= 2:
                 x_edges = self.get_axis_edges(x_sorted)
-                y_edges = numpy.arange(image_sorted.shape[0] + 1, dtype=numpy.float64)
-                self.detector_plot.pcolormesh(
-                    x_edges,
-                    y_edges,
+                # Use imshow, not pcolormesh, on the live path. pcolormesh
+                # builds one quad per pixel (256x1600 ~= 400k quads) and
+                # re-tessellates the whole mesh every frame, which saturates
+                # the Tk main thread on slower lab CPUs and freezes the GUI
+                # until the user toggles back. The wavelength axis is monotonic
+                # and near-linear across the detector, so a linear extent is
+                # visually indistinguishable here and blits as a single raster.
+                self.detector_plot.imshow(
                     image_sorted,
-                    shading="auto",
+                    aspect="auto",
+                    origin="lower",
                     cmap="gray",
-                    rasterized=True,
+                    interpolation="nearest",
+                    extent=[float(x_edges[0]), float(x_edges[-1]), 0, image_sorted.shape[0]],
                 )
                 self.detector_plot.set_xlim(float(x_edges[0]), float(x_edges[-1]))
                 self.detector_plot.set_ylim(0, image_sorted.shape[0])
@@ -1715,7 +1721,15 @@ class SpectrometerFrame(CTkFrame):
                 while not spec.chart_queue.empty():
                     updated = self.update_plot(spec, index) or updated
                 if updated:
-                    self.canvas.draw()
+                    # Image view is far heavier to render than the 1-D spectrum.
+                    # draw_idle() coalesces repaints so they can't queue up
+                    # faster than the machine can draw them (a synchronous
+                    # draw() at the live cadence starves the event loop on
+                    # slower lab CPUs); the lightweight spectrum keeps draw().
+                    if self.image_view_enabled and self.supports_image_view(spec):
+                        self.canvas.draw_idle()
+                    else:
+                        self.canvas.draw()
 
         #print(f"Finished updating graph {datetime.now():%H.%M.%S}")
 
