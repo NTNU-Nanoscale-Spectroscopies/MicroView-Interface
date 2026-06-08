@@ -1,5 +1,66 @@
 import os
+import sys
 from ctypes import cdll,c_long,c_uint32,c_uint16,c_uint8,byref,create_string_buffer,c_bool, c_char, c_char_p,c_int,c_int16,c_int8,c_double,c_float,sizeof,c_voidp, Structure
+
+
+_dll_directory_handles = []
+
+
+def _tlpmx_dll_candidates(dll_name, system_dir):
+	candidates = []
+
+	module_dir = os.path.dirname(os.path.abspath(__file__))
+	candidates.append(os.path.join(module_dir, dll_name))
+
+	meipass = getattr(sys, "_MEIPASS", None)
+	if meipass:
+		candidates.extend([
+			os.path.join(meipass, "dev", "devices", "power_meter", "dll_sdk", dll_name),
+			os.path.join(meipass, dll_name),
+		])
+
+	if getattr(sys, "frozen", False):
+		exe_dir = os.path.dirname(sys.executable)
+		candidates.extend([
+			os.path.join(exe_dir, "dev", "devices", "power_meter", "dll_sdk", dll_name),
+			os.path.join(exe_dir, dll_name),
+		])
+
+	candidates.append(os.path.join(system_dir, dll_name))
+
+	seen = set()
+	unique_candidates = []
+	for candidate in candidates:
+		normalized = os.path.normcase(os.path.abspath(candidate))
+		if normalized not in seen:
+			seen.add(normalized)
+			unique_candidates.append(candidate)
+	return unique_candidates
+
+
+def _load_tlpmx_dll(dll_name, system_dir):
+	candidates = _tlpmx_dll_candidates(dll_name, system_dir)
+	last_error = None
+
+	for dll_path in candidates:
+		if not os.path.exists(dll_path):
+			continue
+
+		dll_dir = os.path.dirname(dll_path)
+		add_dll_directory = getattr(os, "add_dll_directory", None)
+		if add_dll_directory:
+			_dll_directory_handles.append(add_dll_directory(dll_dir))
+
+		try:
+			return cdll.LoadLibrary(dll_path)
+		except OSError as exc:
+			last_error = exc
+
+	if last_error:
+		raise last_error
+
+	searched = "\n".join(f"  - {path}" for path in candidates)
+	raise FileNotFoundError(f"Could not find {dll_name}. Searched:\n{searched}")
 
 _VI_ERROR = (-2147483647-1)
 VI_ON = 1
@@ -333,14 +394,11 @@ class TLPMX:
 		"""
 		if sizeof(c_voidp) == 4:
 			dll_name = "TLPMX_32.dll"
-#			dllabspath = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + dll_name
-			dllabspath = "C:\\Program Files (x86)\\IVI Foundation\\VISA\\WinNT\\Bin\\" + dll_name
-			self.dll = cdll.LoadLibrary(dllabspath)
+			system_dir = "C:\\Program Files (x86)\\IVI Foundation\\VISA\\WinNT\\Bin"
 		else:
 			dll_name = "TLPMX_64.dll"
-#			dllabspath = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + dll_name
-			dllabspath = "C:\\Program Files\\IVI Foundation\\VISA\\Win64\\Bin\\" + dll_name
-			self.dll = cdll.LoadLibrary(dllabspath)
+			system_dir = "C:\\Program Files\\IVI Foundation\\VISA\\Win64\\Bin"
+		self.dll = _load_tlpmx_dll(dll_name, system_dir)
 
 		self.devSession = c_long()
 		self.devSession.value = 0

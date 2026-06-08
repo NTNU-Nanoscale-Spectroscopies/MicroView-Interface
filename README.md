@@ -62,5 +62,5 @@ This project would not have been possible without these contributors :
 - **Angelos XOMALIS** - Project leader
 - **Julia LÖVGREN** - Project supervisor
 - **Noah JACOB** - Developer
-- **Oliver Mineau** - Developer
-- **Eirik Lu** - Developer
+- **Oliver MINEAU** - Developer
+- **Eirik LU** - Developer

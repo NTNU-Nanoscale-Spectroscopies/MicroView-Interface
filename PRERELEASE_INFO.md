@@ -1,3 +1,28 @@
+v4.0.0
+
+    Added:
+        -Andor Kymera 328i / Newton CCD spectrograph in GM and Raman microscopes
+        -Kymera live Raman spectrum view and detector image view
+        -FVB, Image and Multi-track Kymera read modes
+        -Kymera controls for center wavelength, grating, side input slit, shutter, focus mirror and side input iris
+        -Kymera acquisition setup popup for exposure, cycle time, kinetic series, readout hardware, temperature and cooler setup
+        -Signal acquisition workflow with progress display, ASCII XY export, optional .sif export and separate-file options
+        -Z-stack routine with stage movement, optional autofocus, white-light image, laser spot image and Kymera spectrum saved at each Z position
+        -Floating camera window with synced play/pause/save/exposure controls
+        -Kymera simulator for development and UI testing without hardware
+        -Ocean Optics spectrometer backend fallback between cseabreeze and pyseabreeze
+        -PyInstaller bundling for Andor SDK, power meter SDK, libusb, pyusb and seabreeze runtime dependencies
+    
+    Tested:
+        -Version markers updated to V4.0.0 in main.py and microview.spec
+        -No manual hardware validation notes were present in this file for V4.0.0
+    
+    Removed:
+        -No user-facing removals
+
+    Bugs:
+        -No blocking release bugs listed
+
 v3.5.0
 
     Added:

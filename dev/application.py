@@ -244,13 +244,28 @@ class MyApp(CTk):
         self.file_system = FileSystem(self, self.backup_directory, self.directory_frame)
         # wire the open-folder button to the FileSystem implementation
         self.open_folder_button.configure(command=lambda: self.file_system.open_backup_directory())
-        
+
+        self.camera_popout = None
+        self.camera_popout_frame = None
+        self._camera_popped_out = False
+        self._camera_main_image_size = None
+        self._camera_main_frame_size = None
+        self._spec_pwr_main_frame_size = None
+
+        self.right_panel_container = CTkFrame(self, fg_color="transparent")
+        self.right_panel_container.grid(row=1, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=4)
+        self.right_panel_container.grid_propagate(False)
+        self.right_panel_container.grid_columnconfigure(0, weight=1)
+        self.right_panel_container.grid_rowconfigure(0, weight=2)
+        self.right_panel_container.grid_rowconfigure(1, weight=4)
+
         self.camera_frame = CameraFrame(self, self.find_device_by_type(microscope, MyCamera))
-        self.camera_frame.grid(row=1, column=1, padx=(10, 20), pady=10, sticky="nsew", rowspan=2)
+        self.camera_frame.grid(in_=self.right_panel_container, row=0, column=0, pady=(0, 10), sticky="nsew")
 
         # we use a dedicated container for the spectrometer / power‑meter area
         self.spec_pwr_container = CTkFrame(self, fg_color="transparent")
-        self.spec_pwr_container.grid(row=3, column=1, padx=(10, 20), pady=(10, 20), sticky="nsew", rowspan=2)
+        self.spec_pwr_container.grid(in_=self.right_panel_container, row=1, column=0, pady=(10, 0), sticky="nsew")
+        self.spec_pwr_container.grid_propagate(False)
         # layout: row0 for toggle button, row1 for frames
         self.spec_pwr_container.grid_rowconfigure(0, weight=0)
         self.spec_pwr_container.grid_rowconfigure(1, weight=1)
@@ -305,15 +320,21 @@ class MyApp(CTk):
             self.spectrometer_frame.tkraise()
             self._spec_visible = True
 
+        # Left-side panels share one container so the toggle bar and active
+        # menu move together and can use the empty space below the file fields.
+        self.left_panel_container = CTkFrame(self, fg_color="transparent")
+        self.left_panel_container.grid(row=2, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=3)
+        self.left_panel_container.grid_columnconfigure(0, weight=1)
+        self.left_panel_container.grid_rowconfigure(0, weight=0)
+        self.left_panel_container.grid_rowconfigure(1, weight=1)
+
         # instantiate both left-side panels (devices and routines) but do not grid both simultaneously
         self.quick_setup_frame = QuickSetupFrame(self, microscope)
         self.routines_frame = RoutinesFrame(self, microscope)  # new secondary menu
 
-        # small toggle bar placed above the left panel area (keeps same spot and doesn't affect other widgets)
-        self.left_toggle_frame = CTkFrame(self, fg_color="transparent")
-        # reduce vertical padding so toggle buttons sit closer to the panels
-        # anchor to the bottom-left of the middle row so toggles sit just above the left panels and align to their left edge
-        self.left_toggle_frame.grid(row=2, column=0, padx=(20, 10), pady=(0, 0), sticky="sw")
+        # small toggle bar placed above the left panel area
+        self.left_toggle_frame = CTkFrame(self.left_panel_container, fg_color="transparent")
+        self.left_toggle_frame.grid(row=0, column=0, pady=(0, 0), sticky="nw")
  
         self.devices_toggle_btn = CTkButton(self.left_toggle_frame, text="Devices", width=100, fg_color="transparent",
                                             border_width=2, border_color="#1F6AA5",
@@ -392,6 +413,223 @@ class MyApp(CTk):
         if not getattr(self, "_spec_visible", True):
             if self.power_meter_frame.connected_device:
                 self.power_meter_frame._reset_and_start()
+
+    def toggle_camera_popout(self):
+        """Move the camera view between the main layout and a floating window."""
+        if getattr(self, "_camera_popped_out", False):
+            self.restore_camera_frame()
+        else:
+            self.popout_camera_frame()
+
+    def popout_camera_frame(self):
+        """Show the camera in a separate window and let the spectrum area expand."""
+        if not hasattr(self, "camera_frame") or not self.camera_frame:
+            return
+
+        if getattr(self, "camera_popout", None):
+            try:
+                if self.camera_popout.winfo_exists():
+                    self.camera_popout.lift()
+                    try:
+                        self.camera_popout.attributes("-topmost", True)
+                        self.after(250, self._release_camera_popout_topmost)
+                    except Exception:
+                        pass
+                    self.camera_popout.focus_force()
+                    return
+            except Exception:
+                self.camera_popout = None
+                self.camera_popout_frame = None
+
+        self._remember_camera_main_layout()
+
+        try:
+            self.camera_frame.grid_forget()
+        except Exception:
+            pass
+
+        try:
+            self.spec_pwr_container.grid_forget()
+            self.spec_pwr_container.grid(in_=self.right_panel_container, row=0, column=0, rowspan=2, sticky="nsew")
+        except Exception:
+            pass
+
+        width = max(900, self.camera_frame.winfo_width())
+        height = max(650, self.camera_frame.winfo_height())
+        x = self.winfo_x() + 80
+        y = self.winfo_y() + 80
+
+        self.camera_popout = CTkToplevel(self)
+        self.camera_popout.title("Camera view")
+        self.camera_popout.geometry(f"{width}x{height}+{x}+{y}")
+        self.camera_popout.minsize(520, 360)
+        self.camera_popout.resizable(True, True)
+        self.camera_popout.grid_rowconfigure(0, weight=1)
+        self.camera_popout.grid_columnconfigure(0, weight=1)
+        self.camera_popout.protocol("WM_DELETE_WINDOW", self.restore_camera_frame)
+        try:
+            self.camera_popout.attributes("-toolwindow", False)
+        except Exception:
+            pass
+        try:
+            self.camera_popout.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        self.camera_popout_frame = FloatingCameraFrame(self.camera_popout, self.camera_frame, self.restore_camera_frame)
+        self.camera_popout_frame.grid(row=0, column=0, sticky="nsew")
+
+        self._camera_popped_out = True
+        self._bring_camera_popout_to_front()
+        self._refresh_expanded_view(resize_camera=False)
+
+    def _remember_camera_main_layout(self):
+        """Capture the normal right-column split before camera pop-out."""
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+        try:
+            if self.camera_frame.image_width and self.camera_frame.image_height:
+                self._camera_main_image_size = (self.camera_frame.image_width, self.camera_frame.image_height)
+        except Exception:
+            self._camera_main_image_size = None
+        try:
+            self._camera_main_frame_size = (self.camera_frame.winfo_width(), self.camera_frame.winfo_height())
+        except Exception:
+            self._camera_main_frame_size = None
+        try:
+            self._spec_pwr_main_frame_size = (self.spec_pwr_container.winfo_width(), self.spec_pwr_container.winfo_height())
+        except Exception:
+            self._spec_pwr_main_frame_size = None
+
+    def _bring_camera_popout_to_front(self):
+        """Make the floating camera window visible above the main GUI."""
+        popout = getattr(self, "camera_popout", None)
+        if not popout:
+            return
+        try:
+            popout.lift()
+            popout.focus_force()
+        except Exception:
+            pass
+        self.after(250, self._release_camera_popout_topmost)
+
+    def _release_camera_popout_topmost(self):
+        """Release global topmost while keeping the pop-out owned by the app."""
+        popout = getattr(self, "camera_popout", None)
+        if not popout:
+            return
+        try:
+            if popout.winfo_exists():
+                popout.attributes("-topmost", False)
+                popout.lift()
+        except Exception:
+            pass
+
+    def restore_camera_frame(self):
+        """Return the camera to the main layout and restore the initial split."""
+        popout_frame = getattr(self, "camera_popout_frame", None)
+        if popout_frame:
+            try:
+                popout_frame.on_closing()
+            except Exception:
+                pass
+        self.camera_popout_frame = None
+
+        popout = getattr(self, "camera_popout", None)
+        self.camera_popout = None
+        if popout:
+            try:
+                if popout.winfo_exists():
+                    popout.protocol("WM_DELETE_WINDOW", lambda: None)
+                    popout.destroy()
+            except Exception:
+                pass
+
+        if hasattr(self, "camera_frame") and self.camera_frame:
+            try:
+                self.camera_frame.grid_forget()
+                self.camera_frame.grid(in_=self.right_panel_container, row=0, column=0, pady=(0, 10), sticky="nsew")
+            except Exception:
+                pass
+
+        if hasattr(self, "spec_pwr_container") and self.spec_pwr_container:
+            try:
+                self.spec_pwr_container.grid_forget()
+                self.spec_pwr_container.grid(in_=self.right_panel_container, row=1, column=0, pady=(10, 0), sticky="nsew")
+            except Exception:
+                pass
+
+        self._camera_popped_out = False
+        self._restore_camera_main_layout()
+        self._restore_camera_main_image_size()
+        self._refresh_expanded_view(resize_camera=False)
+        self.after(50, self._restore_camera_main_layout)
+
+    def _restore_camera_main_layout(self):
+        """Restore the right-column split captured before pop-out."""
+        camera_height = self._camera_main_frame_size[1] if self._camera_main_frame_size else 0
+        spec_height = self._spec_pwr_main_frame_size[1] if self._spec_pwr_main_frame_size else 0
+        try:
+            self.grid_rowconfigure(1, weight=2, minsize=0)
+            self.grid_rowconfigure(2, weight=2, minsize=0)
+            self.grid_rowconfigure(3, weight=4, minsize=0)
+            self.grid_rowconfigure(4, weight=4, minsize=0)
+            self.right_panel_container.grid_rowconfigure(0, weight=2, minsize=camera_height)
+            self.right_panel_container.grid_rowconfigure(1, weight=4, minsize=spec_height)
+        except Exception:
+            pass
+        try:
+            if self._camera_main_frame_size:
+                self.camera_frame.configure(
+                    width=self._camera_main_frame_size[0],
+                    height=self._camera_main_frame_size[1],
+                )
+        except Exception:
+            pass
+        try:
+            if self._spec_pwr_main_frame_size:
+                self.spec_pwr_container.configure(
+                    width=self._spec_pwr_main_frame_size[0],
+                    height=self._spec_pwr_main_frame_size[1],
+                )
+        except Exception:
+            pass
+        self._restore_camera_main_image_size()
+
+    def _restore_camera_main_image_size(self):
+        """Restore the in-layout camera image dimensions saved before pop-out."""
+        size = getattr(self, "_camera_main_image_size", None)
+        if not size or not hasattr(self, "camera_frame"):
+            return
+        try:
+            width, height = size
+            self.camera_frame.set_image_size(width, height)
+        except Exception:
+            pass
+
+    def _refresh_expanded_view(self, resize_camera=True):
+        """Ask camera and plot widgets to recompute sizes after a layout change."""
+        try:
+            self.update_idletasks()
+        except Exception:
+            pass
+        if resize_camera:
+            try:
+                self.camera_frame.resize_image()
+            except Exception:
+                pass
+        try:
+            if hasattr(self.spectrometer_frame, "canvas"):
+                self.spectrometer_frame.canvas.draw_idle()
+        except Exception:
+            pass
+        try:
+            if hasattr(self.power_meter_frame, "_needs_full_redraw"):
+                self.power_meter_frame._needs_full_redraw = True
+        except Exception:
+            pass
 
     def toggle_spectrometer_power(self):
         """Switch between spectrometer and power meter display frames.
@@ -622,10 +860,11 @@ class MyApp(CTk):
         return None
     
     def stop_devices(self):
-        """Stops and disconnects all devices currently in use, 
+        """Stops and disconnects all devices currently in use,
         then returns to the main menu
         """
         if not self.selected_microscope: return
+        self.restore_camera_frame()
         for device in self.selected_microscope.devices:
             device.disconnect()
         self.notif_list = []
@@ -647,9 +886,9 @@ class MyApp(CTk):
 
         # grid the requested panel into the same location
         if name == "routines":
-            self.routines_frame.grid(row=3, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=2)
+            self.routines_frame.grid(in_=self.left_panel_container, row=1, column=0, sticky="nsew")
         else:
-            self.quick_setup_frame.grid(row=3, column=0, padx=(20, 10), pady=(0, 20), sticky="nsew", rowspan=2)
+            self.quick_setup_frame.grid(in_=self.left_panel_container, row=1, column=0, sticky="nsew")
 
         # Visuals: keep border present for both, only swap fill (fg_color).
         # Choose an appropriate unselected fill depending on current theme.
@@ -759,6 +998,7 @@ class MyApp(CTk):
         self._safety_on_exit()
 
         if not self.is_menu:
+            self.restore_camera_frame()
             self.spectrometer_frame.on_closing()
             self.camera_frame.on_closing()
             if hasattr(self, 'power_meter_frame') and self.power_meter_frame:

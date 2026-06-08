@@ -1,4 +1,29 @@
 # Changelog
+## [4.0.0] - 2026-06-08
+### <span style="color:green"> Added </span>
+- Dev : Andor Kymera 328i / Newton CCD spectrograph implemented for GM and Raman microscope configurations.
+- Dev : Kymera live Raman spectrum view and detector image view added with FVB, Image and Multi-track read modes.
+- Dev : Kymera control strip added for center wavelength, grating, side input slit, shutter, focus mirror and side input iris.
+- Dev : Kymera acquisition setup popup added with exposure, cycle time, kinetic series, readout hardware, temperature and cooler controls.
+- Dev : Kymera signal acquisition workflow added with progress feedback, ASCII XY export, optional SIF export and separate-file options.
+- Dev : Z-stack routine added with stage movement, optional autofocus, white-light images, laser spot images and Kymera spectra saved per Z position.
+- Dev : Floating camera window added with synced play, pause, save and exposure controls.
+- Dev : Kymera simulator added for development and UI testing without hardware.
+- Dev : Ocean Optics spectrometer backend fallback added between cseabreeze and pyseabreeze.
+- Dev : PyInstaller build support added for Andor SDK, power meter SDK, libusb, pyusb and seabreeze runtime dependencies.
+
+### <span style="color:#006bd2"> Fixed </span>
+- Dev : KST201 / FW103M white-light shutter homing, velocity and absolute-angle movement stabilized.
+- Dev : Spectrometer reconnection and acquisition-loop recovery improved after stale SeaBreeze handles, USB read framing errors and unsupported dark correction.
+- Dev : Camera connection fallback improved when a Zelux camera is detected but cannot be opened through the ctypes SDK.
+- Dev : Power meter DLL loading now checks bundled and frozen-app paths before falling back to system VISA paths.
+
+### <span style="color:#d6a600"> Changed </span>
+- Dev : Main application version updated to V4.0.0.
+- Dev : Build target renamed to MicroView V.4.0.0.
+- Dev : Main layout reorganized into shared left and right panel containers for device/routine switching, camera pop-out and expanded plots.
+- Dev : GM and Raman microscope configurations now use the Kymera 328i spectrograph serial KY-05398 and link rotation mounts to it.
+
 ## [3.5.0] - 2026-03-11
 ### <span style="color:green"> Added </span>
 - Dev : GM implemented

@@ -290,6 +290,7 @@ class MyCamera():
         self.is_running = False
         _found = False
         _ctypes_sdk_tried = False
+        _ctypes_camera_seen = False
         
         # First try the ctypes TSI SDK (modern Zelux/TSI cameras)
         try:
@@ -301,26 +302,41 @@ class MyCamera():
                 camera_list = []
             
             if self.serial in (camera_list or []):
+                _ctypes_camera_seen = True
                 # Found via ctypes SDK - use it (Zelux / TSI camera)
-                self.sdk = ctypes_sdk
-                self.camera_list = camera_list
-                self.is_zelux = True
+                opened_camera = None
                 try:
-                    self.camera = self.sdk.open_camera(self.serial)
-                    self.camera.frames_per_trigger_zero_for_unlimited = 0
+                    opened_camera = ctypes_sdk.open_camera(self.serial)
+                    opened_camera.frames_per_trigger_zero_for_unlimited = 0
                     try:
-                        self.camera.arm(2)
-                        self.camera.issue_software_trigger()
+                        opened_camera.arm(2)
+                        opened_camera.issue_software_trigger()
                     except Exception:
                         pass
+                    self.sdk = ctypes_sdk
+                    self.camera = opened_camera
+                    self.camera_list = camera_list
+                    self.is_zelux = True
                     self.connected = getattr(self.sdk, '_is_sdk_open', True)
                     _found = True
                     try:
                         self.software_trigger_timer.start()
                     except Exception:
                         pass
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"Zelux camera {self.serial} was discovered but could not be opened: {e}")
+                    try:
+                        if opened_camera is not None:
+                            opened_camera.dispose()
+                    except Exception:
+                        pass
+                    try:
+                        ctypes_sdk.dispose()
+                    except Exception:
+                        pass
+                    self.sdk = None
+                    self.camera = None
+                    self.is_zelux = False
             else:
                 # Camera not found in ctypes SDK - dispose it so .NET SDK can initialize
                 try:
@@ -331,10 +347,13 @@ class MyCamera():
             pass
 
         # If not found in ctypes TSI SDK, try .NET SDK (legacy CCD cameras like 8051)
-        if not _found:
+        if not _found and not _ctypes_camera_seen:
+            dotnet_sdk = None
+            dotnet_sdk_owned = False
             try:
                 from .tl_dotnet_wrapper import TL_SDK
                 dotnet_sdk = TL_SDK()
+                dotnet_sdk_owned = True
                 cams = dotnet_sdk.DiscoverAvailableCameras()
                 camera_list = [str(c) for c in list(cams)] if cams else []
                 debugp("CCD", f"DotNet SDK discovered cameras: {camera_list}")
@@ -345,6 +364,7 @@ class MyCamera():
                     # Wrap the .NET camera to match ctypes SDK interface
                     self.camera = DotNetCameraWrapper(dotnet_camera, dotnet_sdk)
                     self.sdk = DotNetSDKWrapper(dotnet_sdk)
+                    dotnet_sdk_owned = False
                     
                     self.camera.frames_per_trigger_zero_for_unlimited = 0
                     try:
@@ -367,6 +387,12 @@ class MyCamera():
                 debugp("CCD", f"DotNet SDK connection failed: {e}")
                 import traceback
                 traceback.print_exc()
+            finally:
+                if dotnet_sdk_owned and dotnet_sdk is not None:
+                    try:
+                        dotnet_sdk.sdk.Dispose()
+                    except Exception:
+                        pass
 
         return self.connected
     
