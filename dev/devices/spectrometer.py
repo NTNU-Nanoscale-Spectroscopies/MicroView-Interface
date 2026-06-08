@@ -113,6 +113,17 @@ import seabreeze.spectrometers as _sb_spec
 from seabreeze.spectrometers import Spectrometer, list_devices
 
 
+# Serials of spectrometers currently holding an open handle on the shared
+# backend. cseabreeze exposes ONE process-wide SeaBreezeAPI, so tearing it
+# down (see _refresh_seabreeze_api) invalidates every open device's handle at
+# once -- and the native library then hard-crashes the whole process
+# (exit code 0xC0000409) on the next call into a dead handle. That is exactly
+# the LM failure: the VIS QE Pro connected fine, then the absent NIR's
+# open-retry refreshed the API and killed the live VIS handle. We track open
+# devices here so the refresh can refuse to run while anything else is open.
+_OPEN_SERIALS = set()
+
+
 def _refresh_seabreeze_api():
     """Tear down the cached SeaBreezeAPI so the next list_devices() rebuilds it.
 
@@ -123,6 +134,13 @@ def _refresh_seabreeze_api():
     returns the same empty list. Recreating the API forces a fresh USB
     enumeration on the next call.
     """
+    # Refusing to tear down the shared API while another spectrometer holds an
+    # open handle: doing so would invalidate that handle and crash the process
+    # natively on its next call. A device that genuinely needs a fresh
+    # enumeration will get one once nothing else is open.
+    if _OPEN_SERIALS:
+        debugp("spec", f"Skipping seabreeze API refresh; still open: {sorted(_OPEN_SERIALS)}")
+        return
     cached_api = getattr(_sb_spec.list_devices, "_api", None)
     if cached_api is None:
         return
@@ -199,6 +217,7 @@ class MySpectrometer():
                 pass
 
             self.connected = True
+            _OPEN_SERIALS.add(str(self.serial))
             print(f"Connected to {self.name} ({self.serial})")
         except Exception as e:
             print(f"Failed to open {self.name} ({self.serial}): {e}")
@@ -381,6 +400,7 @@ class MySpectrometer():
             time.sleep(0.2)
             self.spectrometer.close() #Maybe we shouldn't use .close() ?
             self.connected = False
+            _OPEN_SERIALS.discard(str(self.serial))
             print(f"{self.name} disconnected.")
 
 
@@ -393,8 +413,22 @@ class MySpectrometer():
             The required spectrometer integration time
         """
         if self.connected:
-            self.spectrometer.integration_time_micros(time_microseconds)
-            self.integration_time = time_microseconds
+            try:
+                self.spectrometer.integration_time_micros(time_microseconds)
+                self.integration_time = time_microseconds
+            except Exception as e:
+                # Called from a Tk callback (connect / UI change). If the
+                # handle has gone dead, an uncaught error here propagates into
+                # tkinter and the native library can abort the whole process.
+                # Mark the device lost instead so the GUI degrades gracefully.
+                print(f"Failed to set integration time on {self.name}: {e}")
+                self._mark_lost()
+
+    def _mark_lost(self):
+        """Flag the device as no longer reachable without raising."""
+        self.connected = False
+        self.is_running = False
+        _OPEN_SERIALS.discard(str(self.serial))
 
     def get_temperature(self):
         # pyseabreeze's QE Pro device class doesn't expose the thermo_electric
@@ -402,17 +436,20 @@ class MySpectrometer():
         # and every call would raise AttributeError. Short-circuit silently
         # here so the once-per-second update_temperature() poll doesn't spam
         # the console -- the temperature widget will just show "no reading".
-        tec = getattr(getattr(self.spectrometer, "f", None), "thermo_electric", None)
-        if tec is None:
-            return None
+        # The whole body is guarded because accessing ``.f`` on a dead handle
+        # raises a SeaBreezeError (not AttributeError), which getattr() would
+        # not absorb -- and that error reaching the Tk poll crashed the app.
         try:
+            tec = getattr(getattr(self.spectrometer, "f", None), "thermo_electric", None)
+            if tec is None:
+                return None
             tec_status = tec.enable_tec(True)
             tec_temp = tec.read_temperature_degrees_celsius()
             debugp("TEC Enabled:", f"{self.name} : {tec_status}, temp : {tec_temp}c")
             return tec_temp
         except Exception as e:
             debugp("TEC", f"Tec not working : {e}")
-        return
+        return None
 
     def __repr__(self):
         return f"{self.name}, serial : {self.serial}"
